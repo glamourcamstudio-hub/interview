@@ -1,1 +1,7 @@
-streamlit\ngspread\noauth2client\nfpdf2\nplotly\npandas\nsmtplib
+streamlit
+ngspread
+noauth2client
+nfpdf2
+nplotly
+npandas
+nsmtplib
