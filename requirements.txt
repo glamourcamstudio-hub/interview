@@ -1,7 +1,6 @@
 streamlit
-ngspread
-noauth2client
-nfpdf2
-nplotly
-npandas
-nsmtplib
+gspread
+oauth2client
+fpdf2
+plotly
+pandas
