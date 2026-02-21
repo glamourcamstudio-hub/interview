@@ -50,7 +50,7 @@ gold = "#A1783A"
 black = "#0d0d0d"
 st.markdown(f"<style>.stApp {{background-color: {black}; color: white;}} h1, h2 {{color: {gold};}} .stButton > button {{background-color: {gold}; color: {black};}}</style>", unsafe_allow_html=True)
 
-logo_url = "https://via.placeholder.com/300x100/A1783A/0D0D0D?text=GlamourCam+Logo"  # Replace with your GitHub raw URL
+logo_url = "https://glamourcamstudio.com/wp-content/uploads/2024/09/Recurso-8.svg"  # Replace with your GitHub raw URL
 st.image(logo_url, use_column_width=True)
 
 page = st.sidebar.selectbox("Paso", ["Pre-Inscripción", "Entrevista Prospecto", "Test Arquetipos", "Evaluación"])
@@ -375,4 +375,5 @@ elif page == "Evaluación":
         else:
 
             st.error("ID no encontrado.")
+
 
