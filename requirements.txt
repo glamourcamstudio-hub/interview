@@ -4,4 +4,4 @@ oauth2client
 fpdf2
 plotly
 pandas
-pip install fpdf2
+fpdf2
