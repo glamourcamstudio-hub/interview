@@ -1,6 +1,6 @@
 import streamlit as st
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 from fpdf import FPDF
 import plotly.express as px
 import plotly.graph_objects as go
@@ -13,8 +13,16 @@ import pandas as pd
 import datetime
 
 # Config Google Sheets (add JSON key to Streamlit Secrets as 'gcp_service_account' - dict)
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+creds = Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"],
+    scopes=scope
+)
+
 client = gspread.authorize(creds)
 sheet = client.open("GlamourProspectosDB").sheet1  # Create Sheet with columns: Documento_ID, Nombre, Tipo_ID, WhatsApp, Email, Direccion, Departamento, Ciudad, Barrio, Genero, Orientacion, Estado_Civil, Sangre, Hijos, Num_Hijos, Nacimiento_Lugar, Nacimiento_Fecha, Medio, Medio_Otro, Estudios, Estudios_Det, Ingles, Computacion, Ortografico, Exp_Laboral, Otro_Trabajo, Disponibilidad, Razones, Expectativas, Acerca_Mi, Disgustos, Nombre_Artistico, Fetiches, Fecha_Pre, Emerg_Nombre, Emerg_Parentesco, Emerg_Parentesco_Otro, Emerg_Tel, Emerg_Sabe, Exp_Webcam, Exp_Tiempo, Exp_Donde, Exp_Tipo, Exp_Cuales, Consentimiento_Fam, Enfermedades, Enfermedades_Otras, EPS, EPS_Cual, Fecha_Entrevista, Acuerdo_Full, Firma_Tipo, Arquetipo, Score_Total, Clasificacion, Comentarios, Fecha_Eval
 
@@ -351,4 +359,5 @@ elif page == "Evaluación":
                 server.sendmail(gmail_user, studio_email, msg.as_string())
                 server.quit()
         else:
+
             st.error("ID no encontrado.")
