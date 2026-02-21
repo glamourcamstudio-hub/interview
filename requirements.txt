@@ -1,7 +1,9 @@
+oauth2client
 streamlit
 gspread
-oauth2client
-fpdf2
-plotly
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
 pandas
+plotly
 fpdf2
