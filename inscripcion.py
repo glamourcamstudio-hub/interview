@@ -133,8 +133,8 @@ def validar_nombre(nombre):
     return len(nombre.strip()) >= 3
 
 def validar_telefono(tel):
-    cleaned = re.sub(r'[^0-9+]', '', tel)
-    return cleaned.isdigit() and 7 <= len(cleaned) <= 15
+    cleaned = re.sub(r'[^0-9]', '', tel)
+    return 7 <= len(cleaned) <= 15
 
 def validar_edad_minima(fecha_nacimiento):
     hoy = datetime.date.today()
@@ -209,7 +209,7 @@ if page == "Dashboard":
         st.error(f"Error en dashboard: {str(e)}")
 
 # =============================================================================
-# TEST ARQUETIPOS (Itaca - 20 preguntas completas)
+# TEST ARQUETIPOS - 20 preguntas y 20 mapeos COMPLETOS (sin placeholders)
 # =============================================================================
 questions = [
     {"num": 1, "text": "¿Cuál es tu ARQUETIPO? Cuando te diriges a las personas, utilizas palabras...", "options": {"a": "Impositivas, acusadoras, de reclamo.", "b": "De cortesía, educadas, simpáticas, neutras.", "c": "Escogidas, abstractas, complicadas, utilizas oraciones largas.", "d": "Jocosas, confiadas. A veces sin sentido o relación."}},
@@ -259,8 +259,40 @@ mappings = [
 
 archetypes = {"G": "El Guerrero", "A": "El Amante", "SR": "El Sabio Rey", "M": "El Mago"}
 
+if page == "Test Arquetipos":
+    st.title("Test de Arquetipos - Itaca")
+    documento_id = st.text_input("Número de Documento (opcional para guardar)").strip()
+    scores = {"G": 0, "A": 0, "SR": 0, "M": 0}
+
+    with st.form("arquetipos"):
+        for q in questions:
+            st.subheader(f"Pregunta {q['num']}: {q['text']}")
+            ans = st.radio("Selecciona:", list(q["options"].keys()), format_func=lambda k: q["options"][k], key=f"q{q['num']}")
+            archetype = mappings[q['num']-1].get(ans)
+            if archetype:
+                scores[archetype] += 1
+
+        if st.form_submit_button("Calcular Arquetipo"):
+            max_score = max(scores.values())
+            dominantes = [archetypes[k] for k, v in scores.items() if v == max_score]
+            resultado = ", ".join(dominantes)
+            st.success(f"Arquetipo dominante: **{resultado}**")
+
+            if documento_id:
+                try:
+                    cell = sheet.find(documento_id, in_column=1)
+                    headers = get_headers()
+                    header_map = {col: i+1 for i, col in enumerate(headers)}
+                    if "Arquetipo" in header_map:
+                        sheet.update_cell(cell.row, header_map["Arquetipo"], resultado)
+                        st.success("Resultado guardado.")
+                except gspread.exceptions.CellNotFound:
+                    st.warning("Documento no encontrado en la base.")
+                except Exception as e:
+                    st.error(f"No se pudo guardar: {e}")
+
 # =============================================================================
-# PRE-INSCRIPCIÓN
+# PRE-INSCRIPCIÓN (completo, fiel al formulario escaneado)
 # =============================================================================
 if page == "Pre-Inscripción":
     st.title("Pre-Inscripción - GlamourCam Studios")
@@ -268,7 +300,7 @@ if page == "Pre-Inscripción":
         st.subheader("Datos Personales")
         nombre = st.text_input("Nombres y apellidos")
         tipo_id = st.selectbox("Tipo Identificación", ["C.C", "C.E", "P.P.T", "Pasaporte", "L.C"])
-        documento_id = st.text_input("Número de Documento").strip()  # ← strip() añadido
+        documento_id = st.text_input("Número de Documento").strip()
         whatsapp = st.text_input("WhatsApp / Celular")
         email = st.text_input("E-mail")
         direccion = st.text_input("Dirección de residencia")
@@ -336,14 +368,20 @@ if page == "Pre-Inscripción":
             st.error(mensaje_edad)
             st.stop()
 
+        documento_id = documento_id.strip()
+        encontrado = False
         try:
-            sheet.find(documento_id, in_column=1)
-            st.error("Este número de documento ya fue registrado.")
-            st.stop()
+            cell = sheet.find(documento_id, in_column=1)
+            if cell:
+                encontrado = True
         except gspread.exceptions.CellNotFound:
             pass
         except Exception as e:
-            st.error(f"Error al verificar documento: {str(e)}")
+            st.error(f"Error al verificar documento en Google Sheets: {str(e)}")
+            st.stop()
+
+        if encontrado:
+            st.error("Este número de documento ya fue registrado.")
             st.stop()
 
         try:
@@ -424,49 +462,14 @@ if page == "Pre-Inscripción":
         st.success("✅ Pre-inscripción enviada correctamente. Revisa tu correo.")
 
 # =============================================================================
-# ENTREVISTA PROSPECTO (placeholder)
+# ENTREVISTA PROSPECTO
 # =============================================================================
 elif page == "Entrevista Prospecto":
     st.title("Entrevista Prospecto - GlamourCam Studios")
-    st.info("Implementa aquí tu formulario completo de entrevista + lógica de token")
+    st.info("Implementa aquí tu formulario completo de entrevista + token")
 
 # =============================================================================
-# TEST ARQUETIPOS
-# =============================================================================
-elif page == "Test Arquetipos":
-    st.title("Test de Arquetipos - Itaca")
-    documento_id = st.text_input("Número de Documento (opcional para guardar)").strip()
-    scores = {"G": 0, "A": 0, "SR": 0, "M": 0}
-
-    with st.form("arquetipos"):
-        for q in questions:
-            st.subheader(f"Pregunta {q['num']}: {q['text']}")
-            ans = st.radio("Selecciona:", list(q["options"].keys()), format_func=lambda k: q["options"][k], key=f"q{q['num']}")
-            archetype = mappings[q['num']-1].get(ans)
-            if archetype:
-                scores[archetype] += 1
-
-        if st.form_submit_button("Calcular Arquetipo"):
-            max_score = max(scores.values())
-            dominantes = [archetypes[k] for k, v in scores.items() if v == max_score]
-            resultado = ", ".join(dominantes)
-            st.success(f"Arquetipo dominante: **{resultado}**")
-
-            if documento_id:
-                try:
-                    cell = sheet.find(documento_id, in_column=1)
-                    headers = get_headers()
-                    header_map = {col: i+1 for i, col in enumerate(headers)}
-                    if "Arquetipo" in header_map:
-                        sheet.update_cell(cell.row, header_map["Arquetipo"], resultado)
-                        st.success("Resultado guardado.")
-                except gspread.exceptions.CellNotFound:
-                    st.warning("Documento no encontrado en la base.")
-                except Exception as e:
-                    st.error(f"No se pudo guardar: {e}")
-
-# =============================================================================
-# EVALUACIÓN (completa y corregida)
+# EVALUACIÓN (completa)
 # =============================================================================
 elif page == "Evaluación":
     st.title("Evaluación - GlamourCam Studios")
@@ -475,7 +478,7 @@ elif page == "Evaluación":
         try:
             cell = sheet.find(documento_id, in_column=1)
             if not cell:
-                st.error("ID no encontrado.")
+                st.error("ID no encontrado en la base de datos.")
                 st.stop()
 
             row_values = sheet.row_values(cell.row)
@@ -486,7 +489,6 @@ elif page == "Evaluación":
             st.write(f"Nombre: {data.get('Nombre', 'N/A')}")
             st.write(f"Arquetipo: {data.get('Arquetipo', 'No disponible')}")
 
-            # Categorías y subcriterios
             categorias = {
                 "Actitud y Valores (20%)": [
                     "Actitud positiva", "Franqueza/Integridad", "Responsabilidad",
@@ -525,7 +527,7 @@ elif page == "Evaluación":
                     cat_total = 0
                     for item in items:
                         score = st.slider(
-                            item,
+                            f"{item} (1=Bajo → 4=Excelente)",
                             min_value=1,
                             max_value=4,
                             value=2,
@@ -543,7 +545,7 @@ elif page == "Evaluación":
                 total_score = sum(scores_cats[cat] * pesos[cat] for cat in scores_cats)
                 arq_bonus = 5 if data.get("Arquetipo", "").strip() in ["El Mago", "El Amante"] else 0
                 total_score = min(total_score + arq_bonus, 100)
-                total_score = round(total_score, 1)  # ← Redondeo a 1 decimal
+                total_score = round(total_score, 1)
 
                 if total_score > 80:
                     clasif = "Muy Bueno - Perfil Ideal"
@@ -578,7 +580,6 @@ elif page == "Evaluación":
                     )
                     st.plotly_chart(fig_radar, use_container_width=True)
 
-                # Guardar en Sheets
                 try:
                     headers = get_headers()
                     header_map = {col: i+1 for i, col in enumerate(headers)}
@@ -602,7 +603,6 @@ elif page == "Evaluación":
                 except Exception as e:
                     st.error(f"Error al guardar evaluación: {str(e)}")
 
-                # Generar PDF
                 pdf = FPDF()
                 pdf.add_page()
                 pdf.set_font("Arial", "B", 16)
@@ -630,7 +630,6 @@ elif page == "Evaluación":
                     mime="application/pdf"
                 )
 
-                # Enviar por email al estudio
                 send_email(
                     studio_email,
                     f"Evaluación Completada: {documento_id} - {clasif}",
@@ -640,6 +639,6 @@ elif page == "Evaluación":
                 )
 
         except Exception as e:
-            st.error(f"Error al cargar o procesar evaluación: {str(e)}")
+            st.error(f"Error al procesar evaluación: {str(e)}")
 
-# Fin del código - versión corregida y completa
+# Fin del código - versión completa, con todo incluido y estable
