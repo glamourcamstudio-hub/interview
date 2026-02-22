@@ -209,7 +209,7 @@ if page == "Dashboard":
         st.error(f"Error en dashboard: {str(e)}")
 
 # =============================================================================
-# TEST ARQUETIPOS - 20 preguntas y 20 mapeos COMPLETOS (sin placeholders)
+# TEST ARQUETIPOS (20 preguntas y mapeos completos)
 # =============================================================================
 questions = [
     {"num": 1, "text": "¿Cuál es tu ARQUETIPO? Cuando te diriges a las personas, utilizas palabras...", "options": {"a": "Impositivas, acusadoras, de reclamo.", "b": "De cortesía, educadas, simpáticas, neutras.", "c": "Escogidas, abstractas, complicadas, utilizas oraciones largas.", "d": "Jocosas, confiadas. A veces sin sentido o relación."}},
@@ -259,7 +259,284 @@ mappings = [
 
 archetypes = {"G": "El Guerrero", "A": "El Amante", "SR": "El Sabio Rey", "M": "El Mago"}
 
-if page == "Test Arquetipos":
+# =============================================================================
+# PRE-INSCRIPCIÓN (con todas las correcciones de prueba)
+# =============================================================================
+if page == "Pre-Inscripción":
+    st.title("Pre-Inscripción - GlamourCam Studios")
+
+    with st.form("pre_prospecto"):
+        st.subheader("Datos Personales")
+        nombre = st.text_input("Nombres y apellidos")
+        tipo_id = st.selectbox("Tipo Identificación", ["C.C", "C.E", "P.P.T", "Pasaporte", "L.C"])
+        documento_id = st.text_input("Número de Documento")
+        whatsapp = st.text_input("WhatsApp / Celular")
+        email = st.text_input("E-mail")
+        direccion = st.text_input("Dirección de residencia")
+        barrio = st.text_input("Barrio")
+        departamento = st.text_input("Departamento")
+        ciudad = st.text_input("Ciudad")
+        genero = st.radio("Género", ["Masculino", "Femenino"])
+        orientacion = st.text_input("Orientación Sexual")
+        estado_civil = st.radio("Estado Civil", ["Soltero", "Casado", "Viudo", "Separado", "Unión Libre"])
+        sangre = st.text_input("Tipo de Sangre")
+        hijos = st.radio("¿Tienes Hijos?", ["Sí", "No"])
+        num_hijos = st.number_input("Cantidad de hijos", min_value=0, step=1, disabled=(hijos == "No"), value=0 if hijos == "No" else 1)
+        nacimiento_lugar = st.text_input("Lugar de Nacimiento")
+
+        # Fecha máxima dinámica (mayor de 18 años)
+        hoy = datetime.date.today()
+        max_fecha = hoy - datetime.timedelta(days=18*365 + 4)  # Aproximación segura para bisiestos
+        nacimiento_fecha = st.date_input(
+            "Fecha de Nacimiento",
+            min_value=datetime.date(1950, 1, 1),
+            max_value=max_fecha,
+            value=max_fecha.replace(year=max_fecha.year - 10),
+            format="DD/MM/YYYY"
+        )
+
+        medio = st.radio("Medio por el cual te enteraste de Nosotros", [
+            "Redes Sociales", "Página web", "Anuncios en internet",
+            "Referido o voz a voz", "Otros"
+        ])
+        medio_otro = st.text_input("Especifica (si Otros)", disabled=(medio != "Otros"))
+
+        st.subheader("Formación Académica")
+        estudios = st.radio("Nivel de estudios", [
+            "Primaria", "Secundaria", "Técnico/Tecnólogo",
+            "Universitario", "Especialista/Maestría"
+        ])
+        ingles = st.radio("Nivel de Inglés", ["Básico", "Intermedio", "Avanzado", "Nulo"])
+        computacion = st.radio("Manejo en Computación", ["Muy bueno", "Bueno", "Regular", "Malo", "Muy malo"])
+        exp_laboral = st.text_area("Experiencia Laboral General")
+        acuerdo_pre = st.checkbox("Acepto autorización preliminar de datos")
+        submit_pre = st.form_submit_button("Enviar Pre-Inscripción")
+
+    if submit_pre:
+        last_time = st.session_state.get("last_submit_time", 0)
+        current_time = time.time()
+        if current_time - last_time < 30:
+            st.warning("⏳ Debes esperar 30 segundos antes de enviar otro formulario.")
+            st.stop()
+        st.session_state["last_submit_time"] = current_time
+
+        if not acuerdo_pre:
+            st.error("Debes aceptar la autorización.")
+            st.stop()
+
+        if not validar_nombre(nombre):
+            st.error("Nombre inválido (mínimo 3 caracteres).")
+            st.stop()
+        if not validar_email(email):
+            st.error("Correo inválido.")
+            st.stop()
+        if not validar_telefono(whatsapp):
+            st.error("Teléfono inválido.")
+            st.stop()
+        if not documento_id:
+            st.error("Documento requerido.")
+            st.stop()
+
+        if hijos == "Sí" and num_hijos == 0:
+            st.error("Si tiene hijos, la cantidad no puede ser 0.")
+            st.stop()
+
+        edad_valida, mensaje_edad = validar_edad_minima(nacimiento_fecha)
+        if not edad_valida:
+            st.error(mensaje_edad)
+            st.stop()
+
+        documento_id = documento_id.strip()
+        encontrado = False
+        try:
+            cell = sheet.find(documento_id, in_column=1)
+            if cell:
+                encontrado = True
+        except gspread.exceptions.CellNotFound:
+            pass
+        except Exception as e:
+            st.error(f"Error al verificar documento: {str(e)}")
+            st.stop()
+
+        if encontrado:
+            st.error("Este número de documento ya fue registrado.")
+            st.stop()
+
+        try:
+            headers = get_headers()
+            header_map = {col: i+1 for i, col in enumerate(headers)}
+            data = {
+                "Documento_ID": documento_id,
+                "Nombre": nombre,
+                "Tipo_ID": tipo_id,
+                "WhatsApp": whatsapp,
+                "Email": email,
+                "Direccion": direccion,
+                "Barrio": barrio,
+                "Departamento": departamento,
+                "Ciudad": ciudad,
+                "Genero": genero,
+                "Orientacion": orientacion,
+                "Estado_Civil": estado_civil,
+                "Sangre": sangre,
+                "Hijos": hijos,
+                "Num_Hijos": num_hijos if hijos == "Sí" else 0,
+                "Nacimiento_Lugar": nacimiento_lugar,
+                "Nacimiento_Fecha": str(nacimiento_fecha),
+                "Medio": medio,
+                "Medio_Otro": medio_otro if medio == "Otros" else "",
+                "Estudios": estudios,
+                "Ingles": ingles,
+                "Computacion": computacion,
+                "Exp_Laboral": exp_laboral,
+                "Fecha_Pre": str(datetime.datetime.now()),
+                "Estado": "Pre-inscrito"
+            }
+            ordered_row = [data.get(col, "") for col in headers]
+            sheet.append_row(ordered_row)
+        except Exception as e:
+            st.error(f"Error al guardar en base de datos: {str(e)}")
+            st.stop()
+
+        # Generar PDF mejorado
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_fill_color(131, 197, 190)
+        pdf.rect(0, 0, 210, 297, 'F')
+        pdf.set_text_color(13, 13, 13)
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(0, 12, "DOCUMENTO DE PERFIL DEL PROSPECTO A MODELO", ln=1, align="C")
+        pdf.set_font("Arial", size=10)
+        pdf.multi_cell(0, 6, "Bienvenido a GlamourCam Studios, somos un estudio que busca mejorar la calidad de vida de nuestros modelos formando y desarrollando personas íntegras, a través de herramientas, servicios y acompañamiento personalizado e integral.")
+        pdf.ln(10)
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(0, 8, "Datos Personales", border=1, ln=1, fill=True)
+        pdf.set_font("Arial", size=10)
+        pdf.multi_cell(0, 6, f"Nombres y apellidos: {nombre}", border=1)
+        pdf.multi_cell(0, 6, f"Identificación: {tipo_id} Número: {documento_id}", border=1)
+        pdf.multi_cell(0, 6, f"WhatsApp/Celular: {whatsapp} E-mail: {email}", border=1)
+        pdf.multi_cell(0, 6, f"Dirección: {direccion} Barrio: {barrio} Ciudad: {ciudad} Departamento: {departamento}", border=1)
+        pdf.multi_cell(0, 6, f"Género: {genero} Orientación Sexual: {orientacion}", border=1)
+        pdf.multi_cell(0, 6, f"Estado Civil: {estado_civil} Tipo de Sangre: {sangre}", border=1)
+        pdf.multi_cell(0, 6, f"Hijos: {hijos} Cantidad: {num_hijos if hijos == 'Sí' else 'N/A'}", border=1)
+        pdf.multi_cell(0, 6, f"Lugar de Nacimiento: {nacimiento_lugar} Fecha: {nacimiento_fecha}", border=1)
+        pdf.multi_cell(0, 6, f"Medio de enterarse: {medio} {medio_otro if medio == 'Otros' else ''}", border=1)
+        pdf.ln(5)
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(0, 8, "Formación Académica", border=1, ln=1, fill=True)
+        pdf.set_font("Arial", size=10)
+        pdf.multi_cell(0, 6, f"Nivel de estudios: {estudios}", border=1)
+        pdf.multi_cell(0, 6, f"Nivel de Inglés: {ingles}", border=1)
+        pdf.multi_cell(0, 6, f"Manejo en Computación: {computacion}", border=1)
+        pdf.ln(5)
+        pdf.set_font("Arial", "B", 11)
+        pdf.cell(0, 8, "Experiencia Laboral General", border=1, ln=1, fill=True)
+        pdf.set_font("Arial", size=10)
+        pdf.multi_cell(0, 6, f"{exp_laboral or 'No especificado'}", border=1)
+
+        pdf_bytes = pdf.output(dest='S')
+
+        # Enlaces (solo al estudio)
+        enlace_entrevista = "https://tu-app.streamlit.app/?page=Entrevista+Prospecto"  # CAMBIA ESTA URL
+
+        cuerpo_prospecto = f"""
+Gracias por tu pre-inscripción en GlamourCam Studios.
+Tu ID de prospecto es: {documento_id}
+
+Pronto nos pondremos en contacto para agendar tu entrevista presencial.
+PDF adjunto con tus datos.
+
+¡Te esperamos!
+GlamourCam Studios
+"""
+
+        cuerpo_studio = f"""
+Nueva pre-inscripción recibida:
+ID: {documento_id}
+Nombre: {nombre}
+WhatsApp: {whatsapp}
+Email: {email}
+
+PDF adjunto con todos los datos.
+Formulario de entrevista para este prospecto: {enlace_entrevista}
+"""
+
+        send_email(email, "Gracias por tu Pre-Inscripción", cuerpo_prospecto, pdf_bytes, f"Pre_{documento_id}.pdf")
+        send_email(studio_email, f"Nueva Pre-Inscripción: {documento_id}", cuerpo_studio, pdf_bytes, f"Pre_{documento_id}.pdf")
+
+        st.success("✅ Pre-inscripción enviada correctamente. Revisa tu correo.")
+        st.rerun()  # Limpia todo
+
+# =============================================================================
+# ENTREVISTA PROSPECTO (placeholder funcional – amplíalo con la imagen real)
+# =============================================================================
+elif page == "Entrevista Prospecto":
+    st.title("Entrevista Prospecto - GlamourCam Studios")
+    documento_id = st.text_input("Número de Documento (ID para entrevista)").strip()
+    if documento_id:
+        try:
+            cell = sheet.find(documento_id, in_column=1)
+            if not cell:
+                st.error("ID no encontrado.")
+                st.stop()
+
+            row_values = sheet.row_values(cell.row)
+            headers = get_headers()
+            data = dict(zip(headers, row_values))
+
+            st.write("**Datos del Prospecto**")
+            st.write(f"Nombre: {data.get('Nombre', 'N/A')}")
+            st.write(f"WhatsApp: {data.get('WhatsApp', 'N/A')}")
+
+            st.subheader("Formulario de Entrevista")
+            # Aquí van los campos de la imagen de entrevista (motivación, fetiches, disgusto, consentimiento familiar, etc.)
+            # Ejemplo básico – reemplaza con los campos reales de tu imagen
+            motivacion = st.text_area("¿Cuál es tu principal motivación para ser modelo webcam?")
+            expectativas = st.text_area("¿Cuáles son tus expectativas económicas y personales?")
+            fetiches = st.text_area("Fetiches o preferencias de interés")
+            disgusto = st.text_area("Disgustos o límites personales/laborales/sexuales")
+            consentimiento_familiar = st.checkbox("Cuentas con consentimiento familiar para esta actividad")
+            horario_preferido = st.text_input("Horario preferido para entrevistas/shows")
+            observaciones = st.text_area("Observaciones del entrevistador")
+
+            if st.button("Guardar Entrevista"):
+                try:
+                    updates = {
+                        "Motivacion": motivacion,
+                        "Expectativas": expectativas,
+                        "Fetiches": fetiches,
+                        "Disgusto": disgusto,
+                        "Consentimiento_Familiar": "Sí" if consentimiento_familiar else "No",
+                        "Horario_Preferido": horario_preferido,
+                        "Observaciones_Entrevista": observaciones,
+                        "Estado": "Entrevistado",
+                        "Fecha_Entrevista": str(datetime.datetime.now())
+                    }
+                    headers = get_headers()
+                    header_map = {col: i+1 for i, col in enumerate(headers)}
+                    batch = []
+                    for key, value in updates.items():
+                        if key not in header_map:
+                            st.warning(f"Columna '{key}' no existe en la hoja. Agrégala manualmente.")
+                            continue
+                        batch.append({
+                            "range": gspread.utils.rowcol_to_a1(cell.row, header_map[key]),
+                            "values": [[value]]
+                        })
+                    if batch:
+                        sheet.batch_update(batch)
+                    st.success("Entrevista guardada correctamente.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al guardar entrevista: {str(e)}")
+
+        except Exception as e:
+            st.error(f"Error al cargar prospecto: {str(e)}")
+
+# =============================================================================
+# TEST ARQUETIPOS (completo)
+# =============================================================================
+elif page == "Test Arquetipos":
     st.title("Test de Arquetipos - Itaca")
     documento_id = st.text_input("Número de Documento (opcional para guardar)").strip()
     scores = {"G": 0, "A": 0, "SR": 0, "M": 0}
@@ -292,184 +569,7 @@ if page == "Test Arquetipos":
                     st.error(f"No se pudo guardar: {e}")
 
 # =============================================================================
-# PRE-INSCRIPCIÓN (completo, fiel al formulario escaneado)
-# =============================================================================
-if page == "Pre-Inscripción":
-    st.title("Pre-Inscripción - GlamourCam Studios")
-    with st.form("pre_prospecto"):
-        st.subheader("Datos Personales")
-        nombre = st.text_input("Nombres y apellidos")
-        tipo_id = st.selectbox("Tipo Identificación", ["C.C", "C.E", "P.P.T", "Pasaporte", "L.C"])
-        documento_id = st.text_input("Número de Documento").strip()
-        whatsapp = st.text_input("WhatsApp / Celular")
-        email = st.text_input("E-mail")
-        direccion = st.text_input("Dirección de residencia")
-        barrio = st.text_input("Barrio")
-        departamento = st.text_input("Departamento")
-        ciudad = st.text_input("Ciudad")
-        genero = st.radio("Género", ["Masculino", "Femenino"])
-        orientacion = st.text_input("Orientación Sexual")
-        estado_civil = st.radio("Estado Civil", ["Soltero", "Casado", "Viudo", "Separado", "Unión Libre"])
-        sangre = st.text_input("Tipo de Sangre")
-        hijos = st.radio("¿Tienes Hijos?", ["Sí", "No"])
-        num_hijos = st.number_input("Si sí, ¿Cuántos?", min_value=0, disabled=(hijos == "No"))
-        nacimiento_lugar = st.text_input("Lugar de Nacimiento")
-        nacimiento_fecha = st.date_input(
-            "Fecha de Nacimiento",
-            min_value=datetime.date(1950, 1, 1),
-            max_value=datetime.date.today(),
-            value=datetime.date(2000, 1, 1),
-            format="DD/MM/YYYY"
-        )
-        medio = st.radio("Medio por el cual te enteraste de Nosotros", [
-            "Redes Sociales", "Página web", "Anuncios en internet",
-            "Referido o voz a voz", "Otros"
-        ])
-        medio_otro = st.text_input("Si otros, especifica", disabled=(medio != "Otros"))
-        st.subheader("Formación Académica")
-        estudios = st.radio("Nivel de estudios", [
-            "Primaria", "Secundaria", "Técnico/Tecnólogo",
-            "Universitario", "Especialista/Maestría"
-        ])
-        estudios_det = st.text_input("Especifica (si Técnico, Universitario o posgrado)", disabled=(estudios in ["Primaria", "Secundaria"]))
-        ingles = st.radio("Nivel de Inglés", ["Básico", "Intermedio", "Avanzado", "Nulo"])
-        computacion = st.radio("Manejo en Computación", ["Muy bueno", "Bueno", "Regular", "Malo", "Muy malo"])
-        exp_laboral = st.text_area("Experiencia Laboral General")
-        acuerdo_pre = st.checkbox("Acepto autorización preliminar de datos")
-        submit_pre = st.form_submit_button("Enviar Pre-Inscripción")
-
-    if submit_pre:
-        last_time = st.session_state.get("last_submit_time", 0)
-        current_time = time.time()
-        if current_time - last_time < 30:
-            st.warning("⏳ Debes esperar 30 segundos antes de enviar otro formulario.")
-            st.stop()
-        st.session_state["last_submit_time"] = current_time
-
-        if not acuerdo_pre:
-            st.error("Debes aceptar la autorización.")
-            st.stop()
-
-        if not validar_nombre(nombre):
-            st.error("Nombre inválido (mínimo 3 caracteres).")
-            st.stop()
-        if not validar_email(email):
-            st.error("Correo inválido.")
-            st.stop()
-        if not validar_telefono(whatsapp):
-            st.error("Teléfono inválido.")
-            st.stop()
-        if not documento_id:
-            st.error("Documento requerido.")
-            st.stop()
-
-        edad_valida, mensaje_edad = validar_edad_minima(nacimiento_fecha)
-        if not edad_valida:
-            st.error(mensaje_edad)
-            st.stop()
-
-        documento_id = documento_id.strip()
-        encontrado = False
-        try:
-            cell = sheet.find(documento_id, in_column=1)
-            if cell:
-                encontrado = True
-        except gspread.exceptions.CellNotFound:
-            pass
-        except Exception as e:
-            st.error(f"Error al verificar documento en Google Sheets: {str(e)}")
-            st.stop()
-
-        if encontrado:
-            st.error("Este número de documento ya fue registrado.")
-            st.stop()
-
-        try:
-            headers = get_headers()
-            header_map = {col: i+1 for i, col in enumerate(headers)}
-            data = {
-                "Documento_ID": documento_id,
-                "Nombre": nombre,
-                "Tipo_ID": tipo_id,
-                "WhatsApp": whatsapp,
-                "Email": email,
-                "Direccion": direccion,
-                "Barrio": barrio,
-                "Departamento": departamento,
-                "Ciudad": ciudad,
-                "Genero": genero,
-                "Orientacion": orientacion,
-                "Estado_Civil": estado_civil,
-                "Sangre": sangre,
-                "Hijos": hijos,
-                "Num_Hijos": num_hijos if hijos == "Sí" else "",
-                "Nacimiento_Lugar": nacimiento_lugar,
-                "Nacimiento_Fecha": str(nacimiento_fecha),
-                "Medio": medio,
-                "Medio_Otro": medio_otro,
-                "Estudios": estudios,
-                "Estudios_Det": estudios_det,
-                "Ingles": ingles,
-                "Computacion": computacion,
-                "Exp_Laboral": exp_laboral,
-                "Fecha_Pre": str(datetime.datetime.now()),
-                "Estado": "Pre-inscrito"
-            }
-            ordered_row = [data.get(col, "") for col in headers]
-            sheet.append_row(ordered_row)
-        except Exception as e:
-            st.error(f"Error al guardar en base de datos: {str(e)}")
-            st.stop()
-
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_fill_color(131, 197, 190)
-        pdf.rect(0, 0, 210, 297, 'F')
-        pdf.set_text_color(13, 13, 13)
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(0, 12, "DOCUMENTO DE PERFIL DEL PROSPECTO A MODELO", ln=1, align="C")
-        pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, "Bienvenido a GlamourCam Studios, somos un estudio que busca mejorar la calidad de vida de nuestros modelos formando y desarrollando personas íntegras, a través de herramientas, servicios y acompañamiento personalizado e integral.")
-        pdf.ln(8)
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, "Datos Personales", border=1, ln=1, fill=True)
-        pdf.set_font("Arial", size=10)
-        pdf.cell(0, 6, f"Nombres y apellidos: {nombre}", border=1, ln=1)
-        pdf.cell(0, 6, f"Identificación: {tipo_id} Número: {documento_id}", border=1, ln=1)
-        pdf.cell(0, 6, f"WhatsApp/Celular: {whatsapp} E-mail: {email}", border=1, ln=1)
-        pdf.cell(0, 6, f"Dirección: {direccion} Barrio: {barrio} Ciudad: {ciudad} Departamento: {departamento}", border=1, ln=1)
-        pdf.cell(0, 6, f"Género: {genero} Orientación Sexual: {orientacion}", border=1, ln=1)
-        pdf.cell(0, 6, f"Estado Civil: {estado_civil} Tipo de Sangre: {sangre}", border=1, ln=1)
-        pdf.cell(0, 6, f"Hijos: {hijos} Cantidad: {num_hijos if hijos == 'Sí' else 'N/A'}", border=1, ln=1)
-        pdf.cell(0, 6, f"Lugar de Nacimiento: {nacimiento_lugar} Fecha: {nacimiento_fecha}", border=1, ln=1)
-        pdf.cell(0, 6, f"Medio de enterarse: {medio} {medio_otro if medio == 'Otros' else ''}", border=1, ln=1)
-        pdf.ln(5)
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, "Formación Académica", border=1, ln=1, fill=True)
-        pdf.set_font("Arial", size=10)
-        pdf.cell(0, 6, f"Nivel de estudios: {estudios} {estudios_det if estudios not in ['Primaria', 'Secundaria'] else ''}", border=1, ln=1)
-        pdf.cell(0, 6, f"Nivel de Inglés: {ingles}", border=1, ln=1)
-        pdf.cell(0, 6, f"Manejo en Computación: {computacion}", border=1, ln=1)
-        pdf.ln(5)
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, "Experiencia Laboral General", border=1, ln=1, fill=True)
-        pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, f"{exp_laboral or 'No especificado'}", border=1)
-        pdf_bytes = pdf.output(dest='S')
-
-        send_email(email, "Gracias por tu Pre-Inscripción", "Nos pondremos en contacto para agendar tu entrevista presencial. ¡Gracias!", pdf_bytes, f"Pre_{documento_id}.pdf")
-        send_email(studio_email, f"Nueva Pre-Inscripción: {documento_id}", "PDF adjunto para entrevista.", pdf_bytes, f"Pre_{documento_id}.pdf")
-        st.success("✅ Pre-inscripción enviada correctamente. Revisa tu correo.")
-
-# =============================================================================
-# ENTREVISTA PROSPECTO
-# =============================================================================
-elif page == "Entrevista Prospecto":
-    st.title("Entrevista Prospecto - GlamourCam Studios")
-    st.info("Implementa aquí tu formulario completo de entrevista + token")
-
-# =============================================================================
-# EVALUACIÓN (completa)
+# EVALUACIÓN (completo)
 # =============================================================================
 elif page == "Evaluación":
     st.title("Evaluación - GlamourCam Studios")
@@ -478,7 +578,7 @@ elif page == "Evaluación":
         try:
             cell = sheet.find(documento_id, in_column=1)
             if not cell:
-                st.error("ID no encontrado en la base de datos.")
+                st.error("ID no encontrado.")
                 st.stop()
 
             row_values = sheet.row_values(cell.row)
@@ -641,4 +741,4 @@ elif page == "Evaluación":
         except Exception as e:
             st.error(f"Error al procesar evaluación: {str(e)}")
 
-# Fin del código - versión completa, con todo incluido y estable
+# Fin del código completo – versión estable y lista para pruebas
