@@ -202,6 +202,8 @@ if page == "Dashboard":
             if cols_exist:
                 filtro = st.multiselect("Filtrar estado", options=df["Estado"].unique(), default=df["Estado"].unique())
                 df_f = df[df["Estado"].isin(filtro)] if filtro else df
+                if "Score_Total" in df_f.columns:
+                    df_f = df_f.sort_values(by="Score_Total", ascending=False)
                 st.dataframe(df_f[cols_exist])
         else:
             st.info("Aún no hay registros.")
@@ -209,7 +211,7 @@ if page == "Dashboard":
         st.error(f"Error en dashboard: {str(e)}")
 
 # =============================================================================
-# TEST ARQUETIPOS (20 preguntas y mapeos completos)
+# TEST ARQUETIPOS – 20 preguntas únicas y correctas (coinciden con tu imagen)
 # =============================================================================
 questions = [
     {"num": 1, "text": "¿Cuál es tu ARQUETIPO? Cuando te diriges a las personas, utilizas palabras...", "options": {"a": "Impositivas, acusadoras, de reclamo.", "b": "De cortesía, educadas, simpáticas, neutras.", "c": "Escogidas, abstractas, complicadas, utilizas oraciones largas.", "d": "Jocosas, confiadas. A veces sin sentido o relación."}},
@@ -260,10 +262,22 @@ mappings = [
 archetypes = {"G": "El Guerrero", "A": "El Amante", "SR": "El Sabio Rey", "M": "El Mago"}
 
 # =============================================================================
-# PRE-INSCRIPCIÓN (con correcciones de prueba)
+# PRE-INSCRIPCIÓN (validaciones dinámicas + limpieza forzada)
 # =============================================================================
 if page == "Pre-Inscripción":
     st.title("Pre-Inscripción - GlamourCam Studios")
+
+    # Inicializar session_state
+    if 'hijos' not in st.session_state:
+        st.session_state['hijos'] = "No"
+    if 'medio' not in st.session_state:
+        st.session_state['medio'] = "Redes Sociales"
+
+    def update_hijos():
+        st.session_state['hijos'] = st.session_state['hijos_key']
+
+    def update_medio():
+        st.session_state['medio'] = st.session_state['medio_key']
 
     with st.form("pre_prospecto"):
         st.subheader("Datos Personales")
@@ -280,8 +294,10 @@ if page == "Pre-Inscripción":
         orientacion = st.text_input("Orientación Sexual")
         estado_civil = st.radio("Estado Civil", ["Soltero", "Casado", "Viudo", "Separado", "Unión Libre"])
         sangre = st.text_input("Tipo de Sangre")
-        hijos = st.radio("¿Tienes Hijos?", ["Sí", "No"])
-        num_hijos = st.number_input("Cantidad de hijos", min_value=0, step=1, disabled=(hijos == "No"), value=0 if hijos == "No" else 1)
+
+        st.radio("¿Tienes Hijos?", ["Sí", "No"], key='hijos_key', on_change=update_hijos)
+        num_hijos = st.number_input("Cantidad de hijos", min_value=0, step=1, disabled=(st.session_state['hijos'] == "No"), value=0 if st.session_state['hijos'] == "No" else 1)
+
         nacimiento_lugar = st.text_input("Lugar de Nacimiento")
 
         hoy = datetime.date.today()
@@ -290,15 +306,15 @@ if page == "Pre-Inscripción":
             "Fecha de Nacimiento",
             min_value=datetime.date(1950, 1, 1),
             max_value=max_fecha,
-            value=max_fecha.replace(year=max_fecha.year - 10),
+            value=max_fecha - datetime.timedelta(days=365*10),
             format="DD/MM/YYYY"
         )
 
-        medio = st.radio("Medio por el cual te enteraste de Nosotros", [
+        st.radio("Medio por el cual te enteraste de Nosotros", [
             "Redes Sociales", "Página web", "Anuncios en internet",
             "Referido o voz a voz", "Otros"
-        ])
-        medio_otro = st.text_input("Especifica (si Otros)", disabled=(medio != "Otros"))
+        ], key='medio_key', on_change=update_medio)
+        medio_otro = st.text_input("Especifica (si Otros)", disabled=(st.session_state['medio'] != "Otros"))
 
         st.subheader("Formación Académica")
         estudios = st.radio("Nivel de estudios", [
@@ -336,6 +352,7 @@ if page == "Pre-Inscripción":
             st.error("Documento requerido.")
             st.stop()
 
+        hijos = st.session_state['hijos']
         if hijos == "Sí" and num_hijos == 0:
             st.error("Si tiene hijos, la cantidad no puede ser 0.")
             st.stop()
@@ -348,7 +365,13 @@ if page == "Pre-Inscripción":
         documento_id = documento_id.strip()
         encontrado = False
         try:
-            cell = sheet.find(documento_id, in_column=1)
+            headers = get_headers()
+            header_map = {col: i+1 for i, col in enumerate(headers)}
+            col_doc = header_map.get("Documento_ID")
+            if not col_doc:
+                st.error("La columna 'Documento_ID' no existe en la hoja.")
+                st.stop()
+            cell = sheet.find(documento_id, in_column=col_doc)
             encontrado = True
         except gspread.exceptions.CellNotFound:
             pass
@@ -381,8 +404,8 @@ if page == "Pre-Inscripción":
                 "Num_Hijos": num_hijos if hijos == "Sí" else 0,
                 "Nacimiento_Lugar": nacimiento_lugar,
                 "Nacimiento_Fecha": str(nacimiento_fecha),
-                "Medio": medio,
-                "Medio_Otro": medio_otro if medio == "Otros" else "",
+                "Medio": st.session_state['medio'],
+                "Medio_Otro": medio_otro if st.session_state['medio'] == "Otros" else "",
                 "Estudios": estudios,
                 "Ingles": ingles,
                 "Computacion": computacion,
@@ -408,29 +431,29 @@ if page == "Pre-Inscripción":
         pdf.multi_cell(0, 6, "Bienvenido a GlamourCam Studios, somos un estudio que busca mejorar la calidad de vida de nuestros modelos formando y desarrollando personas íntegras, a través de herramientas, servicios y acompañamiento personalizado e integral.")
         pdf.ln(10)
         pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, "Datos Personales", border=1, ln=1, fill=True)
+        pdf.cell(0, 8, "Datos Personales", ln=1)
         pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, f"Nombres y apellidos: {nombre}", border=1)
-        pdf.multi_cell(0, 6, f"Identificación: {tipo_id} Número: {documento_id}", border=1)
-        pdf.multi_cell(0, 6, f"WhatsApp/Celular: {whatsapp} E-mail: {email}", border=1)
-        pdf.multi_cell(0, 6, f"Dirección: {direccion} Barrio: {barrio} Ciudad: {ciudad} Departamento: {departamento}", border=1)
-        pdf.multi_cell(0, 6, f"Género: {genero} Orientación Sexual: {orientacion}", border=1)
-        pdf.multi_cell(0, 6, f"Estado Civil: {estado_civil} Tipo de Sangre: {sangre}", border=1)
-        pdf.multi_cell(0, 6, f"Hijos: {hijos} Cantidad: {num_hijos if hijos == 'Sí' else 'N/A'}", border=1)
-        pdf.multi_cell(0, 6, f"Lugar de Nacimiento: {nacimiento_lugar} Fecha: {nacimiento_fecha}", border=1)
-        pdf.multi_cell(0, 6, f"Medio de enterarse: {medio} {medio_otro if medio == 'Otros' else ''}", border=1)
+        pdf.multi_cell(0, 6, f"Nombres y apellidos: {nombre}")
+        pdf.multi_cell(0, 6, f"Identificación: {tipo_id} Número: {documento_id}")
+        pdf.multi_cell(0, 6, f"WhatsApp/Celular: {whatsapp} E-mail: {email}")
+        pdf.multi_cell(0, 6, f"Dirección: {direccion} Barrio: {barrio} Ciudad: {ciudad} Departamento: {departamento}")
+        pdf.multi_cell(0, 6, f"Género: {genero} Orientación Sexual: {orientacion}")
+        pdf.multi_cell(0, 6, f"Estado Civil: {estado_civil} Tipo de Sangre: {sangre}")
+        pdf.multi_cell(0, 6, f"Hijos: {hijos} Cantidad: {num_hijos if hijos == 'Sí' else 'N/A'}")
+        pdf.multi_cell(0, 6, f"Lugar de Nacimiento: {nacimiento_lugar} Fecha: {nacimiento_fecha}")
+        pdf.multi_cell(0, 6, f"Medio de enterarse: {st.session_state['medio']} {medio_otro if st.session_state['medio'] == 'Otros' else ''}")
         pdf.ln(5)
         pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, "Formación Académica", border=1, ln=1, fill=True)
+        pdf.cell(0, 8, "Formación Académica", ln=1)
         pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, f"Nivel de estudios: {estudios}", border=1)
-        pdf.multi_cell(0, 6, f"Nivel de Inglés: {ingles}", border=1)
-        pdf.multi_cell(0, 6, f"Manejo en Computación: {computacion}", border=1)
+        pdf.multi_cell(0, 6, f"Nivel de estudios: {estudios}")
+        pdf.multi_cell(0, 6, f"Nivel de Inglés: {ingles}")
+        pdf.multi_cell(0, 6, f"Manejo en Computación: {computacion}")
         pdf.ln(5)
         pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, "Experiencia Laboral General", border=1, ln=1, fill=True)
+        pdf.cell(0, 8, "Experiencia Laboral General", ln=1)
         pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, f"{exp_laboral or 'No especificado'}", border=1)
+        pdf.multi_cell(0, 6, f"{exp_laboral or 'No especificado'}")
 
         pdf_bytes = pdf.output(dest='S')
 
@@ -459,23 +482,36 @@ PDF adjunto con todos los datos.
 Formulario de entrevista para este prospecto: {enlace_entrevista}
 """
 
-        send_email(email, "Gracias por tu Pre-Inscripción", cuerpo_prospecto, pdf_bytes, f"Pre_{documento_id}.pdf")
-        send_email(studio_email, f"Nueva Pre-Inscripción: {documento_id}", cuerpo_studio, pdf_bytes, f"Pre_{documento_id}.pdf")
+        ok1 = send_email(email, "Gracias por tu Pre-Inscripción", cuerpo_prospecto, pdf_bytes, f"Pre_{documento_id}.pdf")
+        ok2 = send_email(studio_email, f"Nueva Pre-Inscripción: {documento_id}", cuerpo_studio, pdf_bytes, f"Pre_{documento_id}.pdf")
 
-        st.success("✅ Pre-inscripción enviada correctamente. Revisa tu correo.")
-        st.rerun()  # Limpia el formulario
+        if ok1 and ok2:
+            st.success("✅ Pre-inscripción enviada correctamente. Revisa tu correo.")
+        else:
+            st.warning("⚠️ Pre-inscripción guardada, pero hubo problema enviando uno o ambos correos.")
+
+        # Limpieza forzada
+        for key in list(st.session_state.keys()):
+            if key not in ['authenticated', 'login_attempts', 'lockout_time', 'last_submit_time']:
+                del st.session_state[key]
+        st.rerun()
 
 # =============================================================================
-# ENTREVISTA PROSPECTO
+# ENTREVISTA PROSPECTO (placeholder funcional)
 # =============================================================================
 elif page == "Entrevista Prospecto":
     st.title("Entrevista Prospecto - GlamourCam Studios")
     documento_id = st.text_input("Número de Documento (ID para entrevista)").strip()
     if documento_id:
         try:
-            cell = sheet.find(documento_id, in_column=1)
-            row_values = sheet.row_values(cell.row)
             headers = get_headers()
+            header_map = {col: i+1 for i, col in enumerate(headers)}
+            col_doc = header_map.get("Documento_ID")
+            if not col_doc:
+                st.error("La columna 'Documento_ID' no existe en la hoja.")
+                st.stop()
+            cell = sheet.find(documento_id, in_column=col_doc)
+            row_values = sheet.row_values(cell.row)
             data = dict(zip(headers, row_values))
 
             st.write("**Datos del Prospecto**")
@@ -483,7 +519,6 @@ elif page == "Entrevista Prospecto":
             st.write(f"WhatsApp: {data.get('WhatsApp', 'N/A')}")
 
             st.subheader("Formulario de Entrevista")
-            # Placeholder – amplía con campos reales de la imagen
             motivacion = st.text_area("Motivación principal para ser modelo webcam")
             expectativas = st.text_area("Expectativas económicas y personales")
             fetiches = st.text_area("Fetiches o preferencias de interés")
@@ -505,17 +540,13 @@ elif page == "Entrevista Prospecto":
                         "Estado": "Entrevistado",
                         "Fecha_Entrevista": str(datetime.datetime.now())
                     }
-                    headers = get_headers()
-                    header_map = {col: i+1 for i, col in enumerate(headers)}
                     batch = []
                     for key, value in updates.items():
-                        if key not in header_map:
-                            st.warning(f"Columna '{key}' no existe en la hoja. Agrégala manualmente.")
-                            continue
-                        batch.append({
-                            "range": gspread.utils.rowcol_to_a1(cell.row, header_map[key]),
-                            "values": [[value]]
-                        })
+                        if key in header_map:
+                            batch.append({
+                                "range": gspread.utils.rowcol_to_a1(cell.row, header_map[key]),
+                                "values": [[value]]
+                            })
                     if batch:
                         sheet.batch_update(batch)
                     st.success("Entrevista guardada correctamente.")
@@ -529,7 +560,7 @@ elif page == "Entrevista Prospecto":
             st.error(f"Error al cargar prospecto: {str(e)}")
 
 # =============================================================================
-# TEST ARQUETIPOS (completo)
+# TEST ARQUETIPOS
 # =============================================================================
 elif page == "Test Arquetipos":
     st.title("Test de Arquetipos - Itaca")
@@ -552,9 +583,13 @@ elif page == "Test Arquetipos":
 
             if documento_id:
                 try:
-                    cell = sheet.find(documento_id, in_column=1)
                     headers = get_headers()
                     header_map = {col: i+1 for i, col in enumerate(headers)}
+                    col_doc = header_map.get("Documento_ID")
+                    if not col_doc:
+                        st.error("La columna 'Documento_ID' no existe en la hoja.")
+                        st.stop()
+                    cell = sheet.find(documento_id, in_column=col_doc)
                     if "Arquetipo" in header_map:
                         sheet.update_cell(cell.row, header_map["Arquetipo"], resultado)
                         st.success("Resultado guardado.")
@@ -564,16 +599,21 @@ elif page == "Test Arquetipos":
                     st.error(f"No se pudo guardar: {e}")
 
 # =============================================================================
-# EVALUACIÓN (completo)
+# EVALUACIÓN
 # =============================================================================
 elif page == "Evaluación":
     st.title("Evaluación - GlamourCam Studios")
     documento_id = st.text_input("Número de Documento (ID)").strip()
     if documento_id:
         try:
-            cell = sheet.find(documento_id, in_column=1)
-            row_values = sheet.row_values(cell.row)
             headers = get_headers()
+            header_map = {col: i+1 for i, col in enumerate(headers)}
+            col_doc = header_map.get("Documento_ID")
+            if not col_doc:
+                st.error("La columna 'Documento_ID' no existe en la hoja.")
+                st.stop()
+            cell = sheet.find(documento_id, in_column=col_doc)
+            row_values = sheet.row_values(cell.row)
             data = dict(zip(headers, row_values))
 
             st.write("**Datos Prospecto (resumen)**")
@@ -734,4 +774,4 @@ elif page == "Evaluación":
         except Exception as e:
             st.error(f"Error al procesar evaluación: {str(e)}")
 
-# Fin del código completo
+# Fin del código completo – versión final y robusta
