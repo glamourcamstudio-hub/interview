@@ -260,7 +260,7 @@ mappings = [
 archetypes = {"G": "El Guerrero", "A": "El Amante", "SR": "El Sabio Rey", "M": "El Mago"}
 
 # =============================================================================
-# PRE-INSCRIPCIÓN (con todas las correcciones de prueba)
+# PRE-INSCRIPCIÓN (con correcciones de prueba)
 # =============================================================================
 if page == "Pre-Inscripción":
     st.title("Pre-Inscripción - GlamourCam Studios")
@@ -284,7 +284,6 @@ if page == "Pre-Inscripción":
         num_hijos = st.number_input("Cantidad de hijos", min_value=0, step=1, disabled=(hijos == "No"), value=0 if hijos == "No" else 1)
         nacimiento_lugar = st.text_input("Lugar de Nacimiento")
 
-        # Fecha máxima dinámica (mayor de 18 años, seguro contra bisiesto)
         hoy = datetime.date.today()
         max_fecha = hoy - datetime.timedelta(days=18*365 + 4)
         nacimiento_fecha = st.date_input(
@@ -337,7 +336,6 @@ if page == "Pre-Inscripción":
             st.error("Documento requerido.")
             st.stop()
 
-        # Validación hijos
         if hijos == "Sí" and num_hijos == 0:
             st.error("Si tiene hijos, la cantidad no puede ser 0.")
             st.stop()
@@ -351,8 +349,7 @@ if page == "Pre-Inscripción":
         encontrado = False
         try:
             cell = sheet.find(documento_id, in_column=1)
-            if cell:
-                encontrado = True
+            encontrado = True
         except gspread.exceptions.CellNotFound:
             pass
         except Exception as e:
@@ -437,7 +434,7 @@ if page == "Pre-Inscripción":
 
         pdf_bytes = pdf.output(dest='S')
 
-        # Enlaces (solo al estudio)
+        # Enviar correos
         enlace_entrevista = "https://tu-app.streamlit.app/?page=Entrevista+Prospecto"  # CAMBIA ESTA URL
 
         cuerpo_prospecto = f"""
@@ -469,7 +466,7 @@ Formulario de entrevista para este prospecto: {enlace_entrevista}
         st.rerun()  # Limpia el formulario
 
 # =============================================================================
-# ENTREVISTA PROSPECTO (placeholder funcional)
+# ENTREVISTA PROSPECTO
 # =============================================================================
 elif page == "Entrevista Prospecto":
     st.title("Entrevista Prospecto - GlamourCam Studios")
@@ -477,10 +474,6 @@ elif page == "Entrevista Prospecto":
     if documento_id:
         try:
             cell = sheet.find(documento_id, in_column=1)
-            if not cell:
-                st.error("ID no encontrado.")
-                st.stop()
-
             row_values = sheet.row_values(cell.row)
             headers = get_headers()
             data = dict(zip(headers, row_values))
@@ -530,6 +523,8 @@ elif page == "Entrevista Prospecto":
                 except Exception as e:
                     st.error(f"Error al guardar entrevista: {str(e)}")
 
+        except gspread.exceptions.CellNotFound:
+            st.error("ID no encontrado.")
         except Exception as e:
             st.error(f"Error al cargar prospecto: {str(e)}")
 
@@ -577,10 +572,6 @@ elif page == "Evaluación":
     if documento_id:
         try:
             cell = sheet.find(documento_id, in_column=1)
-            if not cell:
-                st.error("ID no encontrado.")
-                st.stop()
-
             row_values = sheet.row_values(cell.row)
             headers = get_headers()
             data = dict(zip(headers, row_values))
@@ -738,7 +729,9 @@ elif page == "Evaluación":
                     f"Evaluacion_{documento_id}.pdf"
                 )
 
+        except gspread.exceptions.CellNotFound:
+            st.error("ID no encontrado.")
         except Exception as e:
             st.error(f"Error al procesar evaluación: {str(e)}")
 
-# Fin del código completo – versión estable y lista para pruebas
+# Fin del código completo
