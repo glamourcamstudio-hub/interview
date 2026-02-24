@@ -211,7 +211,7 @@ if page == "Dashboard":
         st.error(f"Error en dashboard: {str(e)}")
 
 # =============================================================================
-# TEST ARQUETIPOS – 20 preguntas únicas y correctas (coinciden con tu imagen)
+# TEST ARQUETIPOS – 20 preguntas exactas de tu imagen
 # =============================================================================
 questions = [
     {"num": 1, "text": "¿Cuál es tu ARQUETIPO? Cuando te diriges a las personas, utilizas palabras...", "options": {"a": "Impositivas, acusadoras, de reclamo.", "b": "De cortesía, educadas, simpáticas, neutras.", "c": "Escogidas, abstractas, complicadas, utilizas oraciones largas.", "d": "Jocosas, confiadas. A veces sin sentido o relación."}},
@@ -369,7 +369,7 @@ if page == "Pre-Inscripción":
             header_map = {col: i+1 for i, col in enumerate(headers)}
             col_doc = header_map.get("Documento_ID")
             if not col_doc:
-                st.error("La columna 'Documento_ID' no existe en la hoja.")
+                st.error("La columna 'Documento_ID' no existe en la hoja. Verifica el encabezado.")
                 st.stop()
             cell = sheet.find(documento_id, in_column=col_doc)
             encontrado = True
@@ -457,7 +457,7 @@ if page == "Pre-Inscripción":
 
         pdf_bytes = pdf.output(dest='S')
 
-        # Enviar correos
+        # Enviar correos con verificación
         enlace_entrevista = "https://tu-app.streamlit.app/?page=Entrevista+Prospecto"  # CAMBIA ESTA URL
 
         cuerpo_prospecto = f"""
@@ -490,14 +490,14 @@ Formulario de entrevista para este prospecto: {enlace_entrevista}
         else:
             st.warning("⚠️ Pre-inscripción guardada, pero hubo problema enviando uno o ambos correos.")
 
-        # Limpieza forzada
+        # Limpieza forzada de todos los campos
         for key in list(st.session_state.keys()):
             if key not in ['authenticated', 'login_attempts', 'lockout_time', 'last_submit_time']:
                 del st.session_state[key]
         st.rerun()
 
 # =============================================================================
-# ENTREVISTA PROSPECTO (placeholder funcional)
+# ENTREVISTA PROSPECTO (placeholder funcional – amplíalo con tu imagen)
 # =============================================================================
 elif page == "Entrevista Prospecto":
     st.title("Entrevista Prospecto - GlamourCam Studios")
@@ -774,4 +774,4 @@ elif page == "Evaluación":
         except Exception as e:
             st.error(f"Error al procesar evaluación: {str(e)}")
 
-# Fin del código completo – versión final y robusta
+# Fin del código completo – versión final alineada con tus imágenes
