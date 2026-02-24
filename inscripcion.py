@@ -284,9 +284,9 @@ if page == "Pre-Inscripción":
         num_hijos = st.number_input("Cantidad de hijos", min_value=0, step=1, disabled=(hijos == "No"), value=0 if hijos == "No" else 1)
         nacimiento_lugar = st.text_input("Lugar de Nacimiento")
 
-        # Fecha máxima dinámica (mayor de 18 años)
+        # Fecha máxima dinámica (mayor de 18 años, seguro contra bisiesto)
         hoy = datetime.date.today()
-        max_fecha = hoy - datetime.timedelta(days=18*365 + 4)  # Aproximación segura para bisiestos
+        max_fecha = hoy - datetime.timedelta(days=18*365 + 4)
         nacimiento_fecha = st.date_input(
             "Fecha de Nacimiento",
             min_value=datetime.date(1950, 1, 1),
@@ -337,6 +337,7 @@ if page == "Pre-Inscripción":
             st.error("Documento requerido.")
             st.stop()
 
+        # Validación hijos
         if hijos == "Sí" and num_hijos == 0:
             st.error("Si tiene hijos, la cantidad no puede ser 0.")
             st.stop()
@@ -398,7 +399,7 @@ if page == "Pre-Inscripción":
             st.error(f"Error al guardar en base de datos: {str(e)}")
             st.stop()
 
-        # Generar PDF mejorado
+        # Generar PDF
         pdf = FPDF()
         pdf.add_page()
         pdf.set_fill_color(131, 197, 190)
@@ -465,10 +466,10 @@ Formulario de entrevista para este prospecto: {enlace_entrevista}
         send_email(studio_email, f"Nueva Pre-Inscripción: {documento_id}", cuerpo_studio, pdf_bytes, f"Pre_{documento_id}.pdf")
 
         st.success("✅ Pre-inscripción enviada correctamente. Revisa tu correo.")
-        st.rerun()  # Limpia todo
+        st.rerun()  # Limpia el formulario
 
 # =============================================================================
-# ENTREVISTA PROSPECTO (placeholder funcional – amplíalo con la imagen real)
+# ENTREVISTA PROSPECTO (placeholder funcional)
 # =============================================================================
 elif page == "Entrevista Prospecto":
     st.title("Entrevista Prospecto - GlamourCam Studios")
@@ -489,13 +490,12 @@ elif page == "Entrevista Prospecto":
             st.write(f"WhatsApp: {data.get('WhatsApp', 'N/A')}")
 
             st.subheader("Formulario de Entrevista")
-            # Aquí van los campos de la imagen de entrevista (motivación, fetiches, disgusto, consentimiento familiar, etc.)
-            # Ejemplo básico – reemplaza con los campos reales de tu imagen
-            motivacion = st.text_area("¿Cuál es tu principal motivación para ser modelo webcam?")
-            expectativas = st.text_area("¿Cuáles son tus expectativas económicas y personales?")
+            # Placeholder – amplía con campos reales de la imagen
+            motivacion = st.text_area("Motivación principal para ser modelo webcam")
+            expectativas = st.text_area("Expectativas económicas y personales")
             fetiches = st.text_area("Fetiches o preferencias de interés")
             disgusto = st.text_area("Disgustos o límites personales/laborales/sexuales")
-            consentimiento_familiar = st.checkbox("Cuentas con consentimiento familiar para esta actividad")
+            consentimiento_familiar = st.checkbox("Consentimiento familiar para actividad webcam")
             horario_preferido = st.text_input("Horario preferido para entrevistas/shows")
             observaciones = st.text_area("Observaciones del entrevistador")
 
