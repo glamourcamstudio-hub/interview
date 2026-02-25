@@ -211,7 +211,7 @@ if page == "Dashboard":
         st.error(f"Error en dashboard: {str(e)}")
 
 # =============================================================================
-# TEST ARQUETIPOS (20 preguntas únicas)
+# TEST ARQUETIPOS (20 preguntas exactas de tu imagen)
 # =============================================================================
 questions = [
     {"num": 1, "text": "¿Cuál es tu ARQUETIPO? Cuando te diriges a las personas, utilizas palabras...", "options": {"a": "Impositivas, acusadoras, de reclamo.", "b": "De cortesía, educadas, simpáticas, neutras.", "c": "Escogidas, abstractas, complicadas, utilizas oraciones largas.", "d": "Jocosas, confiadas. A veces sin sentido o relación."}},
@@ -267,7 +267,7 @@ archetypes = {"G": "El Guerrero", "A": "El Amante", "SR": "El Sabio Rey", "M": "
 if page == "Pre-Inscripción":
     st.title("Pre-Inscripción - GlamourCam Studios")
 
-    # Campos dinámicos FUERA del form (para reactividad inmediata)
+    # Campos dinámicos FUERA del form
     st.subheader("Datos Personales")
     nombre = st.text_input("Nombres y apellidos")
     tipo_id = st.selectbox("Tipo Identificación", ["C.C", "C.E", "P.P.T", "Pasaporte", "L.C"])
@@ -283,7 +283,7 @@ if page == "Pre-Inscripción":
     estado_civil = st.radio("Estado Civil", ["Soltero", "Casado", "Viudo", "Separado", "Unión Libre"])
     sangre = st.text_input("Tipo de Sangre")
 
-    # Hijos (dinámico)
+    # Hijos dinámico
     hijos = st.radio("¿Tienes Hijos?", ["Sí", "No"], horizontal=True)
     num_hijos = st.number_input(
         "Cantidad de hijos",
@@ -305,7 +305,7 @@ if page == "Pre-Inscripción":
         format="DD/MM/YYYY"
     )
 
-    # Medio (dinámico)
+    # Medio dinámico
     medio = st.radio("Medio por el cual te enteraste de Nosotros", [
         "Redes Sociales", "Página web", "Anuncios en internet",
         "Referido o voz a voz", "Otros"
@@ -453,9 +453,10 @@ if page == "Pre-Inscripción":
         pdf.set_font("Arial", size=10)
         pdf.multi_cell(0, 6, f"{exp_laboral or 'No especificado'}")
 
-        pdf_bytes = pdf.output(dest='S')
+        pdf_output = pdf.output(dest='S')
+        pdf_bytes = pdf_output.encode('latin-1')  # Versión segura para adjuntos
 
-        # Enviar correos con verificación
+        # Enviar correos
         enlace_entrevista = "https://tu-app.streamlit.app/?page=Entrevista+Prospecto"  # CAMBIA ESTA URL
 
         cuerpo_prospecto = f"""
@@ -750,7 +751,9 @@ elif page == "Evaluación":
                     pdf.cell(0, 6, f"{cat}: {score:.1f}%", ln=1)
                 pdf.ln(5)
                 pdf.multi_cell(0, 8, f"Comentarios: {comentarios or 'Sin comentarios adicionales.'}")
-                pdf_bytes = pdf.output(dest='S')
+
+                pdf_output = pdf.output(dest='S')
+                pdf_bytes = pdf_output.encode('latin-1')  # Versión segura para adjuntos
 
                 st.download_button(
                     label="⬇️ Descargar Reporte PDF",
@@ -772,4 +775,4 @@ elif page == "Evaluación":
         except Exception as e:
             st.error(f"Error al procesar evaluación: {str(e)}")
 
-# Fin del código completo – versión final y funcional
+# Fin del código completo – versión final y lista para pruebas
