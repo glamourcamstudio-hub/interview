@@ -33,14 +33,12 @@ def get_gsheet():
 
 sheet = get_gsheet()
 
-def get_headers():  # Sin cache → evita problemas al borrar filas manualmente
+def get_headers():  # Sin cache para evitar datos viejos en pruebas rápidas
     return sheet.row_values(1)
 
 # ==============================
 # EMAIL
 # ==============================
-studio_email = "glamourcam.studio@gmail.com"  # ← Definido explícitamente
-
 def send_email(to, subject, body, attachment_bytes=None, filename="documento.pdf"):
     try:
         msg = MIMEMultipart()
@@ -99,15 +97,9 @@ st.markdown(f"""
 st.image("https://glamourcamstudio.com/wp-content/uploads/2024/09/Recurso-8.svg", width=700)
 
 # =============================================================================
-# SIDEBAR - NAVEGACIÓN
-# =============================================================================
-page = st.sidebar.selectbox("Paso", ["Pre-Inscripción", "Entrevista Prospecto", "Test Arquetipos", "Evaluación", "Dashboard"])
-st.session_state["page"] = page
-
-# =============================================================================
 # DASHBOARD
 # =============================================================================
-if page == "Dashboard":
+if st.session_state.get("page", "Pre-Inscripción") == "Dashboard":
     st.title("Dashboard Ejecutivo - GlamourCam Studios")
     try:
         df = pd.DataFrame(sheet.get_all_records())
@@ -143,7 +135,7 @@ if page == "Dashboard":
         st.error(f"Error en dashboard: {str(e)}")
 
 # =============================================================================
-# TEST ARQUETIPOS
+# TEST ARQUETIPOS (20 preguntas exactas de tu imagen)
 # =============================================================================
 questions = [
     {"num": 1, "text": "¿Cuál es tu ARQUETIPO? Cuando te diriges a las personas, utilizas palabras...", "options": {"a": "Impositivas, acusadoras, de reclamo.", "b": "De cortesía, educadas, simpáticas, neutras.", "c": "Escogidas, abstractas, complicadas, utilizas oraciones largas.", "d": "Jocosas, confiadas. A veces sin sentido o relación."}},
@@ -352,43 +344,43 @@ if page == "Pre-Inscripción":
             st.error(f"Error al guardar en base de datos: {str(e)}")
             st.stop()
 
-        # PDF (versión segura con bytes())
+        # PDF (con ajuste para evitar error de espacio: reducimos font size y height)
         pdf = FPDF()
         pdf.add_page()
         pdf.set_fill_color(131, 197, 190)
         pdf.rect(0, 0, 210, 297, 'F')
         pdf.set_text_color(13, 13, 13)
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(0, 12, "DOCUMENTO DE PERFIL DEL PROSPECTO A MODELO", ln=1, align="C")
-        pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, "Bienvenido a GlamourCam Studios, somos un estudio que busca mejorar la calidad de vida de nuestros modelos formando y desarrollando personas íntegras, a través de herramientas, servicios y acompañamiento personalizado e integral.")
-        pdf.ln(10)
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, "Datos Personales", ln=1)
-        pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, f"Nombres y apellidos: {nombre}")
-        pdf.multi_cell(0, 6, f"Identificación: {tipo_id} Número: {documento_id}")
-        pdf.multi_cell(0, 6, f"WhatsApp/Celular: {whatsapp} E-mail: {email}")
-        pdf.multi_cell(0, 6, f"Dirección: {direccion} Barrio: {barrio} Ciudad: {ciudad} Departamento: {departamento}")
-        pdf.multi_cell(0, 6, f"Género: {genero} Orientación Sexual: {orientacion}")
-        pdf.multi_cell(0, 6, f"Estado Civil: {estado_civil} Tipo de Sangre: {sangre}")
-        pdf.multi_cell(0, 6, f"Hijos: {hijos} Cantidad: {num_hijos if hijos == 'Sí' else 'N/A'}")
-        pdf.multi_cell(0, 6, f"Lugar de Nacimiento: {nacimiento_lugar} Fecha: {nacimiento_fecha}")
-        pdf.multi_cell(0, 6, f"Medio de enterarse: {medio} {medio_otro if medio == 'Otros' else ''}")
-        pdf.ln(5)
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, "Formación Académica", ln=1)
-        pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, f"Nivel de estudios: {estudios}")
-        pdf.multi_cell(0, 6, f"Nivel de Inglés: {ingles}")
-        pdf.multi_cell(0, 6, f"Manejo en Computación: {computacion}")
-        pdf.ln(5)
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(0, 8, "Experiencia Laboral General", ln=1)
-        pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, f"{exp_laboral or 'No especificado'}")
+        pdf.set_font("Arial", "B", 12)  # Reducimos font size para títulos
+        pdf.cell(0, 10, "DOCUMENTO DE PERFIL DEL PROSPECTO A MODELO", ln=1, align="C")
+        pdf.set_font("Arial", size=8)  # Font size más pequeño para contenido
+        pdf.multi_cell(0, 5, "Bienvenido a GlamourCam Studios, somos un estudio que busca mejorar la calidad de vida de nuestros modelos formando y desarrollando personas íntegras, a través de herramientas, servicios y acompañamiento personalizado e integral.")  # Reducimos height a 5
+        pdf.ln(8)
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(0, 6, "Datos Personales", ln=1)
+        pdf.set_font("Arial", size=8)
+        pdf.multi_cell(0, 5, f"Nombres y apellidos: {nombre}")
+        pdf.multi_cell(0, 5, f"Identificación: {tipo_id} Número: {documento_id}")
+        pdf.multi_cell(0, 5, f"WhatsApp/Celular: {whatsapp} E-mail: {email}")
+        pdf.multi_cell(0, 5, f"Dirección: {direccion} Barrio: {barrio} Ciudad: {ciudad} Departamento: {departamento}")
+        pdf.multi_cell(0, 5, f"Género: {genero} Orientación Sexual: {orientacion}")
+        pdf.multi_cell(0, 5, f"Estado Civil: {estado_civil} Tipo de Sangre: {sangre}")
+        pdf.multi_cell(0, 5, f"Hijos: {hijos} Cantidad: {num_hijos if hijos == 'Sí' else 'N/A'}")
+        pdf.multi_cell(0, 5, f"Lugar de Nacimiento: {nacimiento_lugar} Fecha: {nacimiento_fecha}")
+        pdf.multi_cell(0, 5, f"Medio de enterarse: {medio} {medio_otro if medio == 'Otros' else ''}")
+        pdf.ln(4)
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(0, 6, "Formación Académica", ln=1)
+        pdf.set_font("Arial", size=8)
+        pdf.multi_cell(0, 5, f"Nivel de estudios: {estudios}")
+        pdf.multi_cell(0, 5, f"Nivel de Inglés: {ingles}")
+        pdf.multi_cell(0, 5, f"Manejo en Computación: {computacion}")
+        pdf.ln(4)
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(0, 6, "Experiencia Laboral General", ln=1)
+        pdf.set_font("Arial", size=8)
+        pdf.multi_cell(0, 5, f"{exp_laboral or 'No especificado'}")
 
-        pdf_bytes = bytes(pdf.output(dest='S'))  # Versión segura (soporta tildes y caracteres especiales)
+        pdf_bytes = bytes(pdf.output(dest='S'))  # Versión segura
 
         # Enviar correos
         enlace_entrevista = "https://tu-app.streamlit.app/?page=Entrevista+Prospecto"  # CAMBIA ESTA URL
