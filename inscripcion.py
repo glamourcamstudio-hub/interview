@@ -1,7 +1,7 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
-from fpdf import FPDF
+from fpdf import FPDF  # pip install fpdf2
 import plotly.express as px
 import plotly.graph_objects as go
 from io import BytesIO
@@ -14,6 +14,7 @@ import datetime
 import re
 import time
 import hmac
+import gspread.exceptions
 
 # ==============================
 # GOOGLE SHEETS
@@ -33,8 +34,71 @@ def get_gsheet():
 
 sheet = get_gsheet()
 
-def get_headers():  # Sin cache para evitar datos viejos en pruebas rápidas
+@st.cache_data(ttl=300)
+def get_headers():
     return sheet.row_values(1)
+
+@st.cache_data(ttl=60)
+def get_dataframe():
+    try:
+        return pd.DataFrame(sheet.get_all_records())
+    except:
+        return pd.DataFrame()
+
+# Credenciales
+gmail_user = st.secrets["gmail_user"]
+gmail_pass = st.secrets["gmail_pass"]
+studio_email = "glamourcam.studio@gmail.com"
+ADMIN_PASSWORD = st.secrets["admin_password"]
+
+# ==============================
+# LOGIN + RATE LIMIT
+# ==============================
+def check_password():
+    return st.session_state.get("authenticated", False)
+
+def login():
+    st.title("Login - GlamourCam Studios")
+
+    if "login_attempts" not in st.session_state:
+        st.session_state["login_attempts"] = 0
+    if "lockout_time" not in st.session_state:
+        st.session_state["lockout_time"] = None
+
+    if st.session_state.get("lockout_time") and datetime.datetime.now() < st.session_state["lockout_time"]:
+        tiempo_restante = (st.session_state["lockout_time"] - datetime.datetime.now()).seconds // 60
+        st.error(f"Demasiados intentos. Espera {tiempo_restante + 1} minutos.")
+        st.stop()
+
+    password = st.text_input("Contraseña de entrevistador", type="password")
+
+    if st.button("Ingresar"):
+        if not password:
+            st.warning("Ingresa la contraseña.")
+            return
+
+        if hmac.compare_digest(password, ADMIN_PASSWORD):
+            st.session_state["authenticated"] = True
+            st.session_state["login_attempts"] = 0
+            st.session_state["lockout_time"] = None
+            st.success("¡Bienvenido!")
+            st.rerun()
+        else:
+            st.session_state["login_attempts"] += 1
+            restantes = max(0, 5 - st.session_state["login_attempts"])
+            if st.session_state["login_attempts"] >= 5:
+                st.session_state["lockout_time"] = datetime.datetime.now() + datetime.timedelta(minutes=5)
+                st.session_state["login_attempts"] = 0
+                st.error("Cuenta bloqueada por 5 minutos.")
+            else:
+                st.error(f"Contraseña incorrecta. Intentos restantes: {restantes}")
+            st.rerun()
+
+page = st.sidebar.selectbox("Paso", ["Pre-Inscripción", "Entrevista Prospecto", "Test Arquetipos", "Evaluación", "Dashboard"])
+
+if page != "Pre-Inscripción" and not check_password():
+    login()
+    st.stop()
 
 # ==============================
 # EMAIL
@@ -42,7 +106,7 @@ def get_headers():  # Sin cache para evitar datos viejos en pruebas rápidas
 def send_email(to, subject, body, attachment_bytes=None, filename="documento.pdf"):
     try:
         msg = MIMEMultipart()
-        msg['From'] = st.secrets["gmail_user"]
+        msg['From'] = gmail_user
         msg['To'] = to
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
@@ -52,8 +116,8 @@ def send_email(to, subject, body, attachment_bytes=None, filename="documento.pdf
             msg.attach(part)
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login(st.secrets["gmail_user"], st.secrets["gmail_pass"])
-            server.sendmail(st.secrets["gmail_user"], to, msg.as_string())
+            server.login(gmail_user, gmail_pass)
+            server.sendmail(gmail_user, to, msg.as_string())
         return True
     except Exception as e:
         st.warning(f"No se pudo enviar correo: {str(e)}")
@@ -74,14 +138,21 @@ def validar_telefono(tel):
 
 def validar_edad_minima(fecha_nacimiento):
     hoy = datetime.date.today()
+    
     if fecha_nacimiento > hoy:
         return False, "La fecha de nacimiento no puede ser futura."
-    edad = hoy.year - fecha_nacimiento.year - ((hoy.month, hoy.day) < (fecha_nacimiento.month, fecha_nacimiento.day))
+    
+    edad = hoy.year - fecha_nacimiento.year - (
+        (hoy.month, hoy.day) < (fecha_nacimiento.month, fecha_nacimiento.day)
+    )
+    
     if edad < 18:
         return False, f"Debe tener al menos 18 años (edad actual: {edad})"
+    
     if edad > 55:
         return False, f"La edad máxima permitida es 55 años (edad actual: {edad})"
-    return True, f"Edad válida: {edad} años"
+    
+    return True, f"Edad válida: {edad} años (prospecto permitido)"
 
 # Estilo visual
 gold = "#A1783A"
@@ -99,19 +170,24 @@ st.image("https://glamourcamstudio.com/wp-content/uploads/2024/09/Recurso-8.svg"
 # =============================================================================
 # DASHBOARD
 # =============================================================================
-if st.session_state.get("page", "Pre-Inscripción") == "Dashboard":
+if page == "Dashboard":
     st.title("Dashboard Ejecutivo - GlamourCam Studios")
     try:
-        df = pd.DataFrame(sheet.get_all_records())
+        df = get_dataframe()
         if not df.empty:
             st.subheader("Resumen General")
             cols = st.columns(4)
             cols[0].metric("Total Pre-Inscritas", len(df))
-            entrevistadas = len(df[df.get("Estado", pd.Series()) == "Entrevistado"])
-            evaluadas = len(df[df.get("Estado", pd.Series()) == "Evaluado"])
+            entrevistadas = 0
+            evaluadas = 0
+            if "Estado" in df.columns:
+                entrevistadas = len(df[df["Estado"] == "Entrevistado"])
+                evaluadas = len(df[df["Estado"] == "Evaluado"])
             cols[1].metric("Entrevistadas", entrevistadas)
             cols[2].metric("Evaluadas", evaluadas)
-            aprobadas = len(df[df.get('Clasificacion', pd.Series()).str.contains("Muy Bueno|Bueno", na=False)])
+            aprobadas = 0
+            if "Clasificacion" in df.columns:
+                aprobadas = len(df[df['Clasificacion'].fillna("").str.contains("Muy Bueno|Bueno", na=False)])
             porc = (aprobadas / len(df) * 100) if len(df) > 0 else 0
             cols[3].metric("Aprobadas", aprobadas, f"{porc:.1f}%")
 
@@ -186,7 +262,7 @@ mappings = [
 archetypes = {"G": "El Guerrero", "A": "El Amante", "SR": "El Sabio Rey", "M": "El Mago"}
 
 # =============================================================================
-# PRE-INSCRIPCIÓN (versión final corregida)
+# PRE-INSCRIPCIÓN (campos dinámicos FUERA del form + submit dentro)
 # =============================================================================
 if page == "Pre-Inscripción":
     st.title("Pre-Inscripción - GlamourCam Studios")
@@ -207,6 +283,7 @@ if page == "Pre-Inscripción":
     estado_civil = st.radio("Estado Civil", ["Soltero", "Casado", "Viudo", "Separado", "Unión Libre"])
     sangre = st.text_input("Tipo de Sangre")
 
+    # Hijos dinámico
     hijos = st.radio("¿Tienes Hijos?", ["Sí", "No"], horizontal=True)
     num_hijos = st.number_input(
         "Cantidad de hijos",
@@ -228,6 +305,7 @@ if page == "Pre-Inscripción":
         format="DD/MM/YYYY"
     )
 
+    # Medio dinámico
     medio = st.radio("Medio por el cual te enteraste de Nosotros", [
         "Redes Sociales", "Página web", "Anuncios en internet",
         "Referido o voz a voz", "Otros"
@@ -244,11 +322,11 @@ if page == "Pre-Inscripción":
     exp_laboral = st.text_area("Experiencia Laboral General")
     acuerdo_pre = st.checkbox("Acepto autorización preliminar de datos")
 
+    # Formulario principal (solo submit)
     with st.form("pre_prospecto_submit"):
         submit_pre = st.form_submit_button("Enviar Pre-Inscripción")
 
     if submit_pre:
-        # Rate limit
         last_time = st.session_state.get("last_submit_time", 0)
         current_time = time.time()
         if current_time - last_time < 30:
@@ -256,10 +334,10 @@ if page == "Pre-Inscripción":
             st.stop()
         st.session_state["last_submit_time"] = current_time
 
-        # Validaciones
         if not acuerdo_pre:
             st.error("Debes aceptar la autorización.")
             st.stop()
+
         if not validar_nombre(nombre):
             st.error("Nombre inválido (mínimo 3 caracteres).")
             st.stop()
@@ -272,41 +350,40 @@ if page == "Pre-Inscripción":
         if not documento_id:
             st.error("Documento requerido.")
             st.stop()
+
         if hijos == "Sí" and num_hijos == 0:
             st.error("Si tiene hijos, la cantidad no puede ser 0.")
             st.stop()
+
         edad_valida, mensaje_edad = validar_edad_minima(nacimiento_fecha)
         if not edad_valida:
             st.error(mensaje_edad)
             st.stop()
 
         documento_id = documento_id.strip()
-
-        # Validación de duplicado con conexión fresca
-        headers = get_headers()
-        header_map = {col.strip(): i+1 for i, col in enumerate(headers)}
-        col_doc = header_map.get("Documento_ID")
-        if not col_doc:
-            st.error("La columna 'Documento_ID' no existe en la hoja. Verifica el encabezado.")
+        encontrado = False
+        try:
+            headers = get_headers()
+            header_map = {col: i+1 for i, col in enumerate(headers)}
+            col_doc = header_map.get("Documento_ID")
+            if not col_doc:
+                st.error("La columna 'Documento_ID' no existe en la hoja. Verifica el encabezado.")
+                st.stop()
+            cell = sheet.find(documento_id, in_column=col_doc)
+            encontrado = True
+        except gspread.exceptions.CellNotFound:
+            pass
+        except Exception as e:
+            st.error(f"Error al verificar documento: {str(e)}")
             st.stop()
 
-        # Nueva conexión fresca cada vez que validamos duplicado
-        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        creds_info = st.secrets["gcp_service_account"].to_dict()
-        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-        creds = Credentials.from_service_account_info(creds_info, scopes=scope)
-        client_fresh = gspread.authorize(creds)
-        sheet_fresh = client_fresh.open("GlamourProspectosDB").sheet1
-
-        col_values = sheet_fresh.col_values(col_doc)
-        existing_docs = {str(val).strip() for val in col_values[1:] if val}
-
-        if documento_id in existing_docs:
+        if encontrado:
             st.error("Este número de documento ya fue registrado.")
             st.stop()
 
-        # Guardar
         try:
+            headers = get_headers()
+            header_map = {col: i+1 for i, col in enumerate(headers)}
             data = {
                 "Documento_ID": documento_id,
                 "Nombre": nombre,
@@ -334,17 +411,13 @@ if page == "Pre-Inscripción":
                 "Fecha_Pre": str(datetime.datetime.now()),
                 "Estado": "Pre-inscrito"
             }
-            ordered_row = [data.get(col.strip(), "") for col in headers]
+            ordered_row = [data.get(col, "") for col in headers]
             sheet.append_row(ordered_row)
-
-            # Limpiar todos los caches después de guardar
-            st.cache_data.clear()
-
         except Exception as e:
             st.error(f"Error al guardar en base de datos: {str(e)}")
             st.stop()
 
-        # PDF (versión segura)
+        # Generar PDF
         pdf = FPDF()
         pdf.add_page()
         pdf.set_fill_color(131, 197, 190)
@@ -380,7 +453,8 @@ if page == "Pre-Inscripción":
         pdf.set_font("Arial", size=10)
         pdf.multi_cell(0, 6, f"{exp_laboral or 'No especificado'}")
 
-        pdf_bytes = bytes(pdf.output(dest='S'))  # Versión segura
+        pdf_output = pdf.output(dest='S')
+        pdf_bytes = pdf_output.encode('latin-1')  # Versión segura para adjuntos
 
         # Enviar correos
         enlace_entrevista = "https://tu-app.streamlit.app/?page=Entrevista+Prospecto"  # CAMBIA ESTA URL
@@ -422,7 +496,7 @@ Formulario de entrevista para este prospecto: {enlace_entrevista}
         st.rerun()
 
 # =============================================================================
-# ENTREVISTA PROSPECTO
+# ENTREVISTA PROSPECTO (placeholder funcional)
 # =============================================================================
 elif page == "Entrevista Prospecto":
     st.title("Entrevista Prospecto - GlamourCam Studios")
@@ -430,7 +504,7 @@ elif page == "Entrevista Prospecto":
     if documento_id:
         try:
             headers = get_headers()
-            header_map = {col.strip(): i+1 for i, col in enumerate(headers)}
+            header_map = {col: i+1 for i, col in enumerate(headers)}
             col_doc = header_map.get("Documento_ID")
             if not col_doc:
                 st.error("La columna 'Documento_ID' no existe en la hoja.")
@@ -489,7 +563,7 @@ elif page == "Entrevista Prospecto":
 # =============================================================================
 elif page == "Test Arquetipos":
     st.title("Test de Arquetipos - Itaca")
-    documento_id = st.text_input("Número de Documento (opcional para guardar").strip()
+    documento_id = st.text_input("Número de Documento (opcional para guardar)").strip()
     scores = {"G": 0, "A": 0, "SR": 0, "M": 0}
 
     with st.form("arquetipos"):
@@ -509,7 +583,7 @@ elif page == "Test Arquetipos":
             if documento_id:
                 try:
                     headers = get_headers()
-                    header_map = {col.strip(): i+1 for i, col in enumerate(headers)}
+                    header_map = {col: i+1 for i, col in enumerate(headers)}
                     col_doc = header_map.get("Documento_ID")
                     if not col_doc:
                         st.error("La columna 'Documento_ID' no existe en la hoja.")
@@ -532,7 +606,7 @@ elif page == "Evaluación":
     if documento_id:
         try:
             headers = get_headers()
-            header_map = {col.strip(): i+1 for i, col in enumerate(headers)}
+            header_map = {col: i+1 for i, col in enumerate(headers)}
             col_doc = header_map.get("Documento_ID")
             if not col_doc:
                 st.error("La columna 'Documento_ID' no existe en la hoja.")
@@ -638,7 +712,7 @@ elif page == "Evaluación":
 
                 try:
                     headers = get_headers()
-                    header_map = {col.strip(): i+1 for i, col in enumerate(headers)}
+                    header_map = {col: i+1 for i, col in enumerate(headers)}
                     updates = {
                         "Score_Total": total_score,
                         "Clasificacion": clasif,
@@ -678,7 +752,8 @@ elif page == "Evaluación":
                 pdf.ln(5)
                 pdf.multi_cell(0, 8, f"Comentarios: {comentarios or 'Sin comentarios adicionales.'}")
 
-                pdf_bytes = bytes(pdf.output(dest='S'))  # Versión segura
+                pdf_output = pdf.output(dest='S')
+                pdf_bytes = pdf_output.encode('latin-1')  # Versión segura para adjuntos
 
                 st.download_button(
                     label="⬇️ Descargar Reporte PDF",
@@ -700,4 +775,4 @@ elif page == "Evaluación":
         except Exception as e:
             st.error(f"Error al procesar evaluación: {str(e)}")
 
-# Fin del código completo – versión estable y corregida al 100%
+# Fin del código completo – versión final y lista para pruebas
