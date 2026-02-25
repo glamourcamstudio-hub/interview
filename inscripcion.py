@@ -165,7 +165,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-st.image("https://glamourcamstudio.com/wp-content/uploads/2024/09/Recurso-8.svg", use_column_width=True)
+st.image("https://glamourcamstudio.com/wp-content/uploads/2024/09/Recurso-8.svg", width=700)
 
 # =============================================================================
 # DASHBOARD
@@ -211,7 +211,7 @@ if page == "Dashboard":
         st.error(f"Error en dashboard: {str(e)}")
 
 # =============================================================================
-# TEST ARQUETIPOS – 20 preguntas exactas de tu imagen
+# TEST ARQUETIPOS (20 preguntas únicas)
 # =============================================================================
 questions = [
     {"num": 1, "text": "¿Cuál es tu ARQUETIPO? Cuando te diriges a las personas, utilizas palabras...", "options": {"a": "Impositivas, acusadoras, de reclamo.", "b": "De cortesía, educadas, simpáticas, neutras.", "c": "Escogidas, abstractas, complicadas, utilizas oraciones largas.", "d": "Jocosas, confiadas. A veces sin sentido o relación."}},
@@ -262,69 +262,68 @@ mappings = [
 archetypes = {"G": "El Guerrero", "A": "El Amante", "SR": "El Sabio Rey", "M": "El Mago"}
 
 # =============================================================================
-# PRE-INSCRIPCIÓN (validaciones dinámicas + limpieza forzada)
+# PRE-INSCRIPCIÓN (campos dinámicos FUERA del form + submit dentro)
 # =============================================================================
 if page == "Pre-Inscripción":
     st.title("Pre-Inscripción - GlamourCam Studios")
 
-    # Inicializar session_state
-    if 'hijos' not in st.session_state:
-        st.session_state['hijos'] = "No"
-    if 'medio' not in st.session_state:
-        st.session_state['medio'] = "Redes Sociales"
+    # Campos dinámicos FUERA del form (para reactividad inmediata)
+    st.subheader("Datos Personales")
+    nombre = st.text_input("Nombres y apellidos")
+    tipo_id = st.selectbox("Tipo Identificación", ["C.C", "C.E", "P.P.T", "Pasaporte", "L.C"])
+    documento_id = st.text_input("Número de Documento")
+    whatsapp = st.text_input("WhatsApp / Celular")
+    email = st.text_input("E-mail")
+    direccion = st.text_input("Dirección de residencia")
+    barrio = st.text_input("Barrio")
+    departamento = st.text_input("Departamento")
+    ciudad = st.text_input("Ciudad")
+    genero = st.radio("Género", ["Masculino", "Femenino"])
+    orientacion = st.text_input("Orientación Sexual")
+    estado_civil = st.radio("Estado Civil", ["Soltero", "Casado", "Viudo", "Separado", "Unión Libre"])
+    sangre = st.text_input("Tipo de Sangre")
 
-    def update_hijos():
-        st.session_state['hijos'] = st.session_state['hijos_key']
+    # Hijos (dinámico)
+    hijos = st.radio("¿Tienes Hijos?", ["Sí", "No"], horizontal=True)
+    num_hijos = st.number_input(
+        "Cantidad de hijos",
+        min_value=0,
+        step=1,
+        disabled=(hijos == "No"),
+        value=1 if hijos == "Sí" else 0
+    )
 
-    def update_medio():
-        st.session_state['medio'] = st.session_state['medio_key']
+    nacimiento_lugar = st.text_input("Lugar de Nacimiento")
 
-    with st.form("pre_prospecto"):
-        st.subheader("Datos Personales")
-        nombre = st.text_input("Nombres y apellidos")
-        tipo_id = st.selectbox("Tipo Identificación", ["C.C", "C.E", "P.P.T", "Pasaporte", "L.C"])
-        documento_id = st.text_input("Número de Documento")
-        whatsapp = st.text_input("WhatsApp / Celular")
-        email = st.text_input("E-mail")
-        direccion = st.text_input("Dirección de residencia")
-        barrio = st.text_input("Barrio")
-        departamento = st.text_input("Departamento")
-        ciudad = st.text_input("Ciudad")
-        genero = st.radio("Género", ["Masculino", "Femenino"])
-        orientacion = st.text_input("Orientación Sexual")
-        estado_civil = st.radio("Estado Civil", ["Soltero", "Casado", "Viudo", "Separado", "Unión Libre"])
-        sangre = st.text_input("Tipo de Sangre")
+    hoy = datetime.date.today()
+    max_fecha = hoy - datetime.timedelta(days=18*365 + 4)
+    nacimiento_fecha = st.date_input(
+        "Fecha de Nacimiento",
+        min_value=datetime.date(1950, 1, 1),
+        max_value=max_fecha,
+        value=max_fecha - datetime.timedelta(days=365*10),
+        format="DD/MM/YYYY"
+    )
 
-        st.radio("¿Tienes Hijos?", ["Sí", "No"], key='hijos_key', on_change=update_hijos)
-        num_hijos = st.number_input("Cantidad de hijos", min_value=0, step=1, disabled=(st.session_state['hijos'] == "No"), value=0 if st.session_state['hijos'] == "No" else 1)
+    # Medio (dinámico)
+    medio = st.radio("Medio por el cual te enteraste de Nosotros", [
+        "Redes Sociales", "Página web", "Anuncios en internet",
+        "Referido o voz a voz", "Otros"
+    ])
+    medio_otro = st.text_input("Especifica (si Otros)", disabled=(medio != "Otros"))
 
-        nacimiento_lugar = st.text_input("Lugar de Nacimiento")
+    st.subheader("Formación Académica")
+    estudios = st.radio("Nivel de estudios", [
+        "Primaria", "Secundaria", "Técnico/Tecnólogo",
+        "Universitario", "Especialista/Maestría"
+    ])
+    ingles = st.radio("Nivel de Inglés", ["Básico", "Intermedio", "Avanzado", "Nulo"])
+    computacion = st.radio("Manejo en Computación", ["Muy bueno", "Bueno", "Regular", "Malo", "Muy malo"])
+    exp_laboral = st.text_area("Experiencia Laboral General")
+    acuerdo_pre = st.checkbox("Acepto autorización preliminar de datos")
 
-        hoy = datetime.date.today()
-        max_fecha = hoy - datetime.timedelta(days=18*365 + 4)
-        nacimiento_fecha = st.date_input(
-            "Fecha de Nacimiento",
-            min_value=datetime.date(1950, 1, 1),
-            max_value=max_fecha,
-            value=max_fecha - datetime.timedelta(days=365*10),
-            format="DD/MM/YYYY"
-        )
-
-        st.radio("Medio por el cual te enteraste de Nosotros", [
-            "Redes Sociales", "Página web", "Anuncios en internet",
-            "Referido o voz a voz", "Otros"
-        ], key='medio_key', on_change=update_medio)
-        medio_otro = st.text_input("Especifica (si Otros)", disabled=(st.session_state['medio'] != "Otros"))
-
-        st.subheader("Formación Académica")
-        estudios = st.radio("Nivel de estudios", [
-            "Primaria", "Secundaria", "Técnico/Tecnólogo",
-            "Universitario", "Especialista/Maestría"
-        ])
-        ingles = st.radio("Nivel de Inglés", ["Básico", "Intermedio", "Avanzado", "Nulo"])
-        computacion = st.radio("Manejo en Computación", ["Muy bueno", "Bueno", "Regular", "Malo", "Muy malo"])
-        exp_laboral = st.text_area("Experiencia Laboral General")
-        acuerdo_pre = st.checkbox("Acepto autorización preliminar de datos")
+    # Formulario principal (solo submit)
+    with st.form("pre_prospecto_submit"):
         submit_pre = st.form_submit_button("Enviar Pre-Inscripción")
 
     if submit_pre:
@@ -352,7 +351,6 @@ if page == "Pre-Inscripción":
             st.error("Documento requerido.")
             st.stop()
 
-        hijos = st.session_state['hijos']
         if hijos == "Sí" and num_hijos == 0:
             st.error("Si tiene hijos, la cantidad no puede ser 0.")
             st.stop()
@@ -404,8 +402,8 @@ if page == "Pre-Inscripción":
                 "Num_Hijos": num_hijos if hijos == "Sí" else 0,
                 "Nacimiento_Lugar": nacimiento_lugar,
                 "Nacimiento_Fecha": str(nacimiento_fecha),
-                "Medio": st.session_state['medio'],
-                "Medio_Otro": medio_otro if st.session_state['medio'] == "Otros" else "",
+                "Medio": medio,
+                "Medio_Otro": medio_otro if medio == "Otros" else "",
                 "Estudios": estudios,
                 "Ingles": ingles,
                 "Computacion": computacion,
@@ -441,7 +439,7 @@ if page == "Pre-Inscripción":
         pdf.multi_cell(0, 6, f"Estado Civil: {estado_civil} Tipo de Sangre: {sangre}")
         pdf.multi_cell(0, 6, f"Hijos: {hijos} Cantidad: {num_hijos if hijos == 'Sí' else 'N/A'}")
         pdf.multi_cell(0, 6, f"Lugar de Nacimiento: {nacimiento_lugar} Fecha: {nacimiento_fecha}")
-        pdf.multi_cell(0, 6, f"Medio de enterarse: {st.session_state['medio']} {medio_otro if st.session_state['medio'] == 'Otros' else ''}")
+        pdf.multi_cell(0, 6, f"Medio de enterarse: {medio} {medio_otro if medio == 'Otros' else ''}")
         pdf.ln(5)
         pdf.set_font("Arial", "B", 11)
         pdf.cell(0, 8, "Formación Académica", ln=1)
@@ -490,14 +488,14 @@ Formulario de entrevista para este prospecto: {enlace_entrevista}
         else:
             st.warning("⚠️ Pre-inscripción guardada, pero hubo problema enviando uno o ambos correos.")
 
-        # Limpieza forzada de todos los campos
+        # Limpieza forzada
         for key in list(st.session_state.keys()):
             if key not in ['authenticated', 'login_attempts', 'lockout_time', 'last_submit_time']:
                 del st.session_state[key]
         st.rerun()
 
 # =============================================================================
-# ENTREVISTA PROSPECTO (placeholder funcional – amplíalo con tu imagen)
+# ENTREVISTA PROSPECTO (placeholder funcional)
 # =============================================================================
 elif page == "Entrevista Prospecto":
     st.title("Entrevista Prospecto - GlamourCam Studios")
@@ -774,4 +772,4 @@ elif page == "Evaluación":
         except Exception as e:
             st.error(f"Error al procesar evaluación: {str(e)}")
 
-# Fin del código completo – versión final alineada con tus imágenes
+# Fin del código completo – versión final y funcional
