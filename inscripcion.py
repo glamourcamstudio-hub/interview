@@ -33,12 +33,14 @@ def get_gsheet():
 
 sheet = get_gsheet()
 
-def get_headers():  # Sin cache para evitar problemas al borrar filas manualmente
+def get_headers():  # Sin cache → evita problemas al borrar filas manualmente
     return sheet.row_values(1)
 
 # ==============================
 # EMAIL
 # ==============================
+studio_email = "glamourcam.studio@gmail.com"  # ← Definido explícitamente
+
 def send_email(to, subject, body, attachment_bytes=None, filename="documento.pdf"):
     try:
         msg = MIMEMultipart()
@@ -97,7 +99,7 @@ st.markdown(f"""
 st.image("https://glamourcamstudio.com/wp-content/uploads/2024/09/Recurso-8.svg", width=700)
 
 # =============================================================================
-# SIDEBAR - SELECCIÓN DE PÁGINA
+# SIDEBAR - NAVEGACIÓN
 # =============================================================================
 page = st.sidebar.selectbox("Paso", ["Pre-Inscripción", "Entrevista Prospecto", "Test Arquetipos", "Evaluación", "Dashboard"])
 st.session_state["page"] = page
@@ -141,7 +143,7 @@ if page == "Dashboard":
         st.error(f"Error en dashboard: {str(e)}")
 
 # =============================================================================
-# TEST ARQUETIPOS (20 preguntas exactas de tu imagen)
+# TEST ARQUETIPOS
 # =============================================================================
 questions = [
     {"num": 1, "text": "¿Cuál es tu ARQUETIPO? Cuando te diriges a las personas, utilizas palabras...", "options": {"a": "Impositivas, acusadoras, de reclamo.", "b": "De cortesía, educadas, simpáticas, neutras.", "c": "Escogidas, abstractas, complicadas, utilizas oraciones largas.", "d": "Jocosas, confiadas. A veces sin sentido o relación."}},
@@ -192,12 +194,12 @@ mappings = [
 archetypes = {"G": "El Guerrero", "A": "El Amante", "SR": "El Sabio Rey", "M": "El Mago"}
 
 # =============================================================================
-# PRE-INSCRIPCIÓN (versión final con todos los fixes)
+# PRE-INSCRIPCIÓN (versión final corregida)
 # =============================================================================
 if page == "Pre-Inscripción":
     st.title("Pre-Inscripción - GlamourCam Studios")
 
-    # === CAMPOS DINÁMICOS FUERA DEL FORM ===
+    # Campos dinámicos FUERA del form
     st.subheader("Datos Personales")
     nombre = st.text_input("Nombres y apellidos")
     tipo_id = st.selectbox("Tipo Identificación", ["C.C", "C.E", "P.P.T", "Pasaporte", "L.C"])
@@ -250,7 +252,6 @@ if page == "Pre-Inscripción":
     exp_laboral = st.text_area("Experiencia Laboral General")
     acuerdo_pre = st.checkbox("Acepto autorización preliminar de datos")
 
-    # === FORMULARIO CON SOLO SUBMIT ===
     with st.form("pre_prospecto_submit"):
         submit_pre = st.form_submit_button("Enviar Pre-Inscripción")
 
@@ -289,7 +290,7 @@ if page == "Pre-Inscripción":
 
         documento_id = documento_id.strip()
 
-        # === VALIDACIÓN DE DUPLICADO CON LECTURA FRESCA ===
+        # Validación de duplicado con conexión fresca
         headers = get_headers()
         header_map = {col.strip(): i+1 for i, col in enumerate(headers)}
         col_doc = header_map.get("Documento_ID")
@@ -297,8 +298,14 @@ if page == "Pre-Inscripción":
             st.error("La columna 'Documento_ID' no existe en la hoja. Verifica el encabezado.")
             st.stop()
 
-        # Forzamos lectura fresca
-        sheet_fresh = get_gsheet()
+        # Nueva conexión fresca cada vez que validamos duplicado
+        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        creds_info = st.secrets["gcp_service_account"].to_dict()
+        creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+        creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+        client_fresh = gspread.authorize(creds)
+        sheet_fresh = client_fresh.open("GlamourProspectosDB").sheet1
+
         col_values = sheet_fresh.col_values(col_doc)
         existing_docs = {str(val).strip() for val in col_values[1:] if val}
 
@@ -306,7 +313,7 @@ if page == "Pre-Inscripción":
             st.error("Este número de documento ya fue registrado.")
             st.stop()
 
-        # === GUARDAR ===
+        # Guardar
         try:
             data = {
                 "Documento_ID": documento_id,
@@ -338,14 +345,14 @@ if page == "Pre-Inscripción":
             ordered_row = [data.get(col.strip(), "") for col in headers]
             sheet.append_row(ordered_row)
 
-            # LIMPIAMOS CACHE DESPUÉS DE GUARDAR (clave para el bug de duplicado fantasma)
+            # Limpiar todos los caches después de guardar
             st.cache_data.clear()
 
         except Exception as e:
             st.error(f"Error al guardar en base de datos: {str(e)}")
             st.stop()
 
-        # PDF
+        # PDF (versión segura con bytes())
         pdf = FPDF()
         pdf.add_page()
         pdf.set_fill_color(131, 197, 190)
@@ -381,8 +388,7 @@ if page == "Pre-Inscripción":
         pdf.set_font("Arial", size=10)
         pdf.multi_cell(0, 6, f"{exp_laboral or 'No especificado'}")
 
-        pdf_output = pdf.output(dest='S')
-        pdf_bytes = pdf_output.encode('latin-1')
+        pdf_bytes = bytes(pdf.output(dest='S'))  # Versión segura (soporta tildes y caracteres especiales)
 
         # Enviar correos
         enlace_entrevista = "https://tu-app.streamlit.app/?page=Entrevista+Prospecto"  # CAMBIA ESTA URL
@@ -680,8 +686,7 @@ elif page == "Evaluación":
                 pdf.ln(5)
                 pdf.multi_cell(0, 8, f"Comentarios: {comentarios or 'Sin comentarios adicionales.'}")
 
-                pdf_output = pdf.output(dest='S')
-                pdf_bytes = pdf_output.encode('latin-1')
+                pdf_bytes = bytes(pdf.output(dest='S'))  # Versión segura
 
                 st.download_button(
                     label="⬇️ Descargar Reporte PDF",
